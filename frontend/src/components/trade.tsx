@@ -11,6 +11,7 @@ export type LineOut = Line & {
   igst: string; line_total: string; received_quantity?: string | null; returned_quantity?: string | null;
 };
 export type Totals = {
+  prices_include_tax?: boolean;
   subtotal: string; discount_total: string; taxable_total: string; cgst_total: string; sgst_total: string;
   igst_total: string; round_off: string; total: string; is_interstate: boolean; place_of_supply: string | null;
 };
@@ -141,7 +142,7 @@ export function TotalsBox({ t, children }: { t: Totals; children?: React.ReactNo
     <div className={`flex justify-between py-0.5 ${strong ? "border-t border-slate-200 pt-1.5 text-base font-semibold dark:border-slate-700" : ""}`}><span className="text-slate-500">{label}</span><span>{inr(v)}</span></div>;
   return (
     <div className="ml-auto w-full max-w-xs text-sm">
-      {row("Subtotal", t.subtotal)}
+      {row(t.prices_include_tax ? "Subtotal (incl. GST)" : "Subtotal", t.subtotal)}
       {Number(t.discount_total) > 0 && row("Discount", `-${t.discount_total}`)}
       {row("Taxable value", t.taxable_total)}
       {t.is_interstate ? row("IGST", t.igst_total) : <>{row("CGST", t.cgst_total)}{row("SGST", t.sgst_total)}</>}

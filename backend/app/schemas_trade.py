@@ -209,6 +209,7 @@ class QuotationIn(BaseModel):
     valid_until: date | None = None
     place_of_supply: str | None = Field(default=None, pattern=r"^\d{2}$")
     document_discount: Decimal = Field(default=Decimal("0"), ge=0, decimal_places=2)
+    prices_include_tax: bool | None = None  # None -> organization default
     notes: str | None = None
     terms: str | None = None
     lines: list[LineIn] = Field(min_length=1)
@@ -223,6 +224,7 @@ class QuotationOut(TotalsOut):
     valid_until: date | None
     status: str
     document_discount: Decimal
+    prices_include_tax: bool = False
     notes: str | None
     terms: str | None
     converted_invoice_id: int | None = None
@@ -240,6 +242,7 @@ class InvoiceIn(BaseModel):
     due_date: date | None = None
     place_of_supply: str | None = Field(default=None, pattern=r"^\d{2}$")
     document_discount: Decimal = Field(default=Decimal("0"), ge=0, decimal_places=2)
+    prices_include_tax: bool | None = None  # None -> organization default
     notes: str | None = None
     terms: str | None = None
     idempotency_key: str | None = Field(default=None, max_length=80)
@@ -264,6 +267,7 @@ class InvoiceOut(TotalsOut):
     status: str
     display_status: str = ""
     document_discount: Decimal
+    prices_include_tax: bool = False
     amount_paid: Decimal
     credited_amount: Decimal
     balance_due: Decimal = Decimal("0")
@@ -318,6 +322,7 @@ class PaymentIn(BaseModel):
     payment_date: date
     amount: Decimal = Field(gt=0, max_digits=14, decimal_places=2)
     method: PaymentMethod
+    account_id: int | None = None  # default: cash -> cash account, everything else -> bank account
     reference: str | None = Field(default=None, max_length=80)
     notes: str | None = None
     idempotency_key: str | None = Field(default=None, max_length=80)
@@ -353,6 +358,8 @@ class PaymentOut(ORM):
     amount: Decimal
     unallocated: Decimal = Decimal("0")
     method: str
+    account_id: int | None = None
+    account_name: str | None = None
     reference: str | None
     notes: str | None
     voided_at: datetime | None

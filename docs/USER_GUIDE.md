@@ -85,6 +85,36 @@ Invoices and bills are not money. Only payments recorded here count as cash rece
 bounces or a UPI payment is reversed, **Void** the payment: the invoice becomes due again, and the record
 stays, with your reason.
 
+## Printing
+- On an invoice, **Print A4** opens a PDF to print or save; **Thermal** opens an 80 mm receipt for roll
+  printers. Draft invoices print as **DRAFT** and cancelled ones as **CANCELLED**.
+- Quotations have a **Print** button. On **Payments**, the printer icon produces a receipt (money in) or a
+  voucher (money out).
+- Add your logo, bank/UPI payment instructions and terms in **Settings**; they appear on invoices.
+
+## Expenses, income and accounts
+- **Finance** shows each cash and bank account's balance. A "Cash in hand" and a "Bank" account are created
+  automatically. Add your real accounts with their opening balances, and mark the ones to use by default.
+- **Record expense** for rent, electricity, salaries and so on. Fill in "GST you can claim" only if your
+  accountant confirms you can take input credit on that bill; that amount is left out of expenses in the
+  profit and loss.
+- **Transfer** records cash deposited to the bank, or withdrawn.
+- Mistakes are **voided** (kept with a reason), never deleted.
+
+## Tax rates and GST-inclusive prices
+- Under **Settings, GST rates**, list the rates your accountant confirmed. Once at least one is listed, a
+  document can only use rates in effect on its date. When a rate changes, **Retire** the old one with its
+  last day and add the new one. Older invoices stay valid.
+- If your shelf prices include GST, tick **Prices I enter include GST** in Settings, or choose it per invoice.
+  NetCare then works out the taxable value from the price.
+
+## Reports
+Open **Reports**, pick a report and a period, and download it as PDF, Excel or CSV for your accountant.
+- **Profit and loss** is an operating summary: net sales, minus the cost of goods sold, minus expenses.
+- **Daily closing** helps you count the cash drawer at the end of the day.
+- **Customer dues** shows who to chase.
+- **GST summary** is a **draft** for your accountant. It is not a return to file.
+
 ## Dashboard
 Choose a period (today, week, month, quarter, or Indian financial year starting 1 April) and a location. All
 figures come from your records. Modules that are not built yet are listed under **Not yet available**, and

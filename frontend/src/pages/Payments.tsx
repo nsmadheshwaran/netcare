@@ -1,13 +1,14 @@
 import { useState, type FormEvent } from "react";
-import { Ban, Link2, Plus } from "lucide-react";
-import { api, inr, type Page } from "../api";
+import { Ban, Link2, Plus, Printer } from "lucide-react";
+import { api, inr, openPdf, type Page } from "../api";
+import { AccountSelect } from "./Finance";
 import { useAuth } from "../auth";
 import { PartySelect, today, useCustomers, useSuppliers } from "../components/trade";
 import { Badge, Empty, ErrorBanner, Field, Modal, PageHeader, Pager, Spinner, useAsync } from "../components/ui";
 
 type Payment = {
   id: number; number: string; direction: "in" | "out"; customer_id: number | null; supplier_id: number | null; party_name: string;
-  payment_date: string; amount: string; unallocated: string; method: string; reference: string | null; voided_at: string | null;
+  payment_date: string; amount: string; unallocated: string; method: string; account_name: string | null; reference: string | null; voided_at: string | null;
   void_reason: string | null; allocations: { id: number; amount: string; invoice_number: string | null }[];
 };
 type OpenDoc = { id: number; number: string | null; supplier_invoice_number?: string; balance_due: string; invoice_date: string };
@@ -40,15 +41,16 @@ function PaymentForm({ onDone }: { onDone: () => void }) {
   const suppliers = useSuppliers();
   const [direction, setDirection] = useState<"in" | "out">("in");
   const [party, setParty] = useState<number | "">("");
-  const [f, setF] = useState({ amount: "", method: "cash", payment_date: today(), reference: "", notes: "" });
+  const [f, setF] = useState({ amount: "", method: "cash", payment_date: today(), reference: "", notes: "", account_id: "" });
   const [alloc, setAlloc] = useState<Record<number, string>>({});
+  const accounts = useAsync(() => api<any[]>("/accounts").catch(() => []), []);
   const [error, setError] = useState<string | null>(null);
   const [idem] = useState(() => crypto.randomUUID());
   async function submit(e: FormEvent) {
     e.preventDefault();
     const allocations = Object.entries(alloc).filter(([, v]) => Number(v) > 0).map(([id, v]) => ({ invoice_id: Number(id), amount: v }));
     try {
-      await api("/payments", { method: "POST", json: { ...f, reference: f.reference || null, notes: f.notes || null, idempotency_key: idem, allocations,
+      await api("/payments", { method: "POST", json: { ...f, account_id: f.account_id ? Number(f.account_id) : null, reference: f.reference || null, notes: f.notes || null, idempotency_key: idem, allocations,
         ...(direction === "in" ? { customer_id: party } : { supplier_id: party }) } });
       onDone();
     } catch (err: any) { setError(err.message); }
@@ -66,6 +68,7 @@ function PaymentForm({ onDone }: { onDone: () => void }) {
         <Field label="Date"><input className="input" type="date" required value={f.payment_date} onChange={(e) => setF({ ...f, payment_date: e.target.value })} /></Field>
         <Field label="Reference"><input className="input" value={f.reference} onChange={(e) => setF({ ...f, reference: e.target.value })} /></Field>
         <Field label="Notes"><input className="input" value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} /></Field>
+        {!!accounts.data?.length && <AccountSelect label="Account" value={f.account_id} onChange={(v) => setF({ ...f, account_id: v })} accounts={accounts.data} optional="Default for method" />}
       </div>
       <OpenDocs direction={direction} partyId={party} max={Number(f.amount || 0)} value={alloc} onChange={setAlloc} />
       <div className="flex justify-end gap-2"><button type="button" className="btn-ghost" onClick={onDone}>Cancel</button><button className="btn-primary">Save payment</button></div>
@@ -123,7 +126,7 @@ export default function Payments() {
                 <tr key={p.id} className={`border-t border-slate-100 dark:border-slate-800 ${p.voided_at ? "opacity-50" : ""}`}>
                   <td className="td font-mono text-xs">{p.number}</td><td className="td">{p.payment_date}</td>
                   <td className="td">{p.party_name} <Badge tone={p.direction === "in" ? "green" : "amber"}>{p.direction === "in" ? "received" : "paid"}</Badge></td>
-                  <td className="td">{p.method.replace("_", " ")}{p.reference ? <div className="text-xs text-slate-500">{p.reference}</div> : null}</td>
+                  <td className="td">{p.method.replace("_", " ")}{p.reference ? <div className="text-xs text-slate-500">{p.reference}</div> : null}{p.account_name ? <div className="text-xs text-slate-500">{p.account_name}</div> : null}</td>
                   <td className="td text-xs">
                     {p.voided_at ? <span className="text-red-600">Voided: {p.void_reason}</span> : <>
                       {p.allocations.map((a) => <div key={a.id}>{a.invoice_number}: {inr(a.amount)}</div>)}
@@ -131,7 +134,9 @@ export default function Payments() {
                     </>}
                   </td>
                   <td className="td text-right font-medium">{inr(p.amount)}</td>
-                  <td className="td whitespace-nowrap text-right">{can("payments.edit") && !p.voided_at && <>
+                  <td className="td whitespace-nowrap text-right">
+                    <button className="rounded p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700" title="Print receipt" onClick={() => openPdf(`/payments/${p.id}/pdf`).catch((e) => setErr(e.message))} aria-label="Print receipt"><Printer size={15} /></button>
+                    {can("payments.edit") && !p.voided_at && <>
                     {Number(p.unallocated) > 0 && <button className="rounded p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700" title="Apply to invoices" onClick={() => setDialog(p)} aria-label="Apply advance"><Link2 size={15} /></button>}
                     <button className="rounded p-1.5 text-red-600 hover:bg-slate-200 dark:hover:bg-slate-700" title="Void" onClick={() => voidPayment(p)} aria-label="Void payment"><Ban size={15} /></button>
                   </>}</td>

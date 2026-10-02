@@ -60,6 +60,35 @@ Each form was type-checked, and the same API calls they make were exercised.
   customer, paying another tenant's invoice; inventory managers cannot approve POs; accountants are
   read-only on sales; technicians see no sales or payments.
 
+## Results at Phase 3 (2026-10-02)
+| Suite | Result |
+|---|---|
+| Backend pytest | **60 passed**: 45 earlier (one new inclusive-price maths test), plus 15 finance/report/PDF tests |
+| `alembic check` and migration data-preservation test | passed through `0003` |
+| pyflakes | clean (app and tests) |
+| Frontend vitest, `tsc`, Vite build | 3 passed, no errors, built |
+| Mutation check | Two deliberate bugs were inserted: returning stock at the current average instead of the original cost, and starting new products at zero cost. Both made tests fail and were reverted |
+| Visual check | A generated A4 invoice, a thermal receipt and a P&L PDF were opened and read. Layout bugs found this way were fixed: wrapped headers, missing address commas, unexplained discounts on the thermal receipt, left-aligned report amounts |
+| Live run | Expenses, account balances, P&L, cash flow, and PDF/Excel downloads through the running app; the Finance, Expenses and Reports pages render the data |
+
+### Phase 3 test coverage
+- **Costing:** moving average across receipts; the sale cost is frozen at issue; restocked returns go back in at
+  the original cost (checked against the resulting average); transfers don't move the average; new products
+  start at their purchase price.
+- **Finance:** default category creation, default account creation per method, cash flow per account
+  (opening, in, out, closing, totals), claimable GST excluded from the P&L, voiding removes an entry from
+  reports, daily closing by method, validation (category kind, tax > amount, self-transfer, negative
+  amounts), idempotency.
+- **Tax:** the rate master is optional until configured; duplicate open rate refused; retirement is enforced
+  by date, including the last valid day; history is kept; only owners manage rates; inclusive vs exclusive
+  invoices.
+- **Reports:** all 10 reports in all 4 formats (Excel files re-opened, PDFs checked for a valid header),
+  organization name with `&` and `<`, invalid range, unknown report, ageing buckets, formula neutralising in
+  CSV, role access, tenant isolation.
+- **Documents:** A4 and thermal invoices, quotation, payment receipt; inline vs download; logo upload rejects
+  SVG disguised as PNG, GIF and oversize files.
+- **Words:** lakh/crore grouping, paise, zero.
+
 ## What the backend tests cover
 - **Auth:** registration, login, `/me`, Argon2 hash stored, duplicate email, weak password, rate limit (429),
   invalid tokens, token revocation on password change.

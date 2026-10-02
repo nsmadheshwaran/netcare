@@ -13,13 +13,15 @@ ALL = {
     "purchases.view", "purchases.edit", "purchases.approve",
     "sales.view", "sales.edit",
     "payments.view", "payments.edit",
+    "expenses.view", "expenses.edit", "finance.view", "finance.manage", "reports.view",
 }
 
 ROLE_PERMISSIONS: dict[str, set[str]] = {
     "owner": set(ALL),
     "manager": ALL - {"org.manage"},
     "accountant": {"customers.view", "products.view", "inventory.view", "dashboard.view", "audit.view",
-                   "suppliers.view", "purchases.view", "sales.view", "payments.view", "payments.edit"},
+                   "suppliers.view", "purchases.view", "sales.view", "payments.view", "payments.edit",
+                   "expenses.view", "expenses.edit", "finance.view", "finance.manage", "reports.view"},
     "salesperson": {"customers.view", "customers.edit", "products.view", "inventory.view", "dashboard.view",
                     "sales.view", "sales.edit", "payments.view", "payments.edit"},
     "inventory_manager": {"products.view", "products.edit", "inventory.view", "inventory.adjust",

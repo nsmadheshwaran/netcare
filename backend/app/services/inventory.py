@@ -1,8 +1,8 @@
 """All stock changes go through apply_movement(). Callers own the transaction (commit)."""
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..models import Location, Product, StockLevel, StockMovement
@@ -11,6 +11,23 @@ from ..models import Location, Product, StockLevel, StockMovement
 SIGN = {"stock_in": 1, "customer_return": 1, "purchase_receipt": 1, "transfer_in": 1, "sale_cancel": 1,
         "stock_out": -1, "damaged": -1, "supplier_return": -1, "sale": -1, "transfer_out": -1,
         "service_part": -1}
+
+
+# Inflows that bring in goods at a known cost and therefore move the average.
+# Transfers are internal and never change it.
+COST_BEARING_INFLOWS = {"stock_in", "purchase_receipt", "customer_return", "sale_cancel", "adjustment"}
+
+
+def _total_on_hand(db: Session, product_id: int) -> Decimal:
+    return Decimal(db.scalar(select(func.coalesce(func.sum(StockLevel.quantity), 0))
+                             .where(StockLevel.product_id == product_id)))
+
+
+def sale_cost(db: Session, org_id: int, sale_idempotency_key: str) -> Decimal | None:
+    """Unit cost recorded when a line was sold, so returns go back in at the same cost."""
+    m = db.scalar(select(StockMovement).where(StockMovement.organization_id == org_id,
+                                              StockMovement.idempotency_key == sale_idempotency_key))
+    return m.unit_cost if m else None
 
 
 class StockError(HTTPException):
@@ -44,7 +61,8 @@ def apply_movement(db: Session, *, org_id: int, user_id: int | None, product_id:
                 raise StockError("Idempotency key already used for a different movement")
             return existing
 
-    product = db.get(Product, product_id)
+    # Locked: the moving-average cost below is a read-modify-write on the product row.
+    product = db.scalar(select(Product).where(Product.id == product_id).with_for_update())
     if not product or product.organization_id != org_id or product.archived_at is not None:
         raise StockError("Product not found", status.HTTP_404_NOT_FOUND)
     if product.is_service:
@@ -68,6 +86,14 @@ def apply_movement(db: Session, *, org_id: int, user_id: int | None, product_id:
     new_qty = Decimal(level.quantity) + delta
     if new_qty < 0 and not allow_negative:
         raise StockError(f"Insufficient stock: {level.quantity} available at {location.name}")
+
+    avg = Decimal(product.avg_cost or 0)
+    if delta > 0 and unit_cost is not None and movement_type in COST_BEARING_INFLOWS:
+        on_hand = max(_total_on_hand(db, product_id), Decimal("0"))
+        product.avg_cost = ((on_hand * avg + delta * Decimal(unit_cost)) / (on_hand + delta)).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP)
+    elif unit_cost is None:
+        unit_cost = avg  # outflows, transfers and uncosted adjustments are valued at current average cost
     level.quantity = new_qty
 
     mov = StockMovement(organization_id=org_id, product_id=product_id, location_id=location_id,

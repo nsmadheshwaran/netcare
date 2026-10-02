@@ -146,7 +146,7 @@ def test_dashboard_uses_real_data(tenant):
     assert d["customers"] == {"total": 1, "new_in_period": 1}
     assert d["inventory"]["stock_valuation_at_cost"] == "5000.00"
     assert d["inventory"]["low_stock_count"] == 1  # 2 <= min 3
-    assert "expenses" in d["not_yet_available"] and "sales" not in d["not_yet_available"]
+    assert "service" in d["not_yet_available"] and "expenses" not in d["not_yet_available"]
     for period in ("week", "month", "quarter", "year"):
         assert tenant.get(f"/api/v1/dashboard/summary?period={period}").status_code == 200
     assert tenant.get("/api/v1/dashboard/summary?period=bogus").status_code == 422

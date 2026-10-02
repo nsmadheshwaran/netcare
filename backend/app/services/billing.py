@@ -69,7 +69,10 @@ class Totals:
 
 
 def compute(lines: list[LineInput], *, interstate: bool, document_discount: Decimal = ZERO,
-            round_to_rupee: bool = False) -> Totals:
+            round_to_rupee: bool = False, prices_include_tax: bool = False) -> Totals:
+    """With prices_include_tax, unit prices and discounts are GST-inclusive: the discounted inclusive amount
+    is the line total, taxable = amount * 100 / (100 + rate), and tax is the exact remainder.
+    In that mode subtotal and discount_total are inclusive figures too."""
     if not lines:
         raise HTTPException(422, "At least one line is required")
     gross = [money(li.quantity * li.unit_price) for li in lines]
@@ -91,8 +94,13 @@ def compute(lines: list[LineInput], *, interstate: bool, document_discount: Deci
 
     t = Totals()
     for li, g, ld, n, s in zip(lines, gross, line_disc, net, shares):
-        taxable = n - s
-        tax = money(taxable * li.tax_rate / 100)
+        if prices_include_tax:
+            inclusive = n - s
+            taxable = money(inclusive * 100 / (100 + li.tax_rate))
+            tax = inclusive - taxable
+        else:
+            taxable = n - s
+            tax = money(taxable * li.tax_rate / 100)
         if interstate:
             cgst = sgst = ZERO
             igst = tax
@@ -128,7 +136,8 @@ def fiscal_year(d: date) -> str:
 
 DEFAULT_PREFIX = {"sales_invoice": "INV", "quotation": "QT", "purchase_order": "PO", "goods_receipt": "GRN",
                   "purchase_invoice": "PB", "credit_note": "CN", "purchase_return": "PR",
-                  "receipt": "RCPT", "supplier_payment": "PAY"}
+                  "receipt": "RCPT", "supplier_payment": "PAY", "expense": "EXP", "income": "INC",
+                  "transfer": "TRF"}
 
 
 def next_number(db: Session, org_id: int, doc_type: str, on: date) -> str:

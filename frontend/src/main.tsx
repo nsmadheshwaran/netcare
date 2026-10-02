@@ -15,6 +15,8 @@ import Suppliers from "./pages/Suppliers";
 import Purchases from "./pages/Purchases";
 import Payments from "./pages/Payments";
 import { Invoices, Quotations } from "./pages/Sales";
+import { Expenses, Finance } from "./pages/Finance";
+import Reports from "./pages/Reports";
 
 if (localStorage.getItem("netcare.theme") === "dark") document.documentElement.classList.add("dark");
 
@@ -41,6 +43,9 @@ createRoot(document.getElementById("root")!).render(
             <Route path="quotations" element={<Quotations />} />
             <Route path="purchases" element={<Purchases />} />
             <Route path="payments" element={<Payments />} />
+            <Route path="expenses" element={<Expenses />} />
+            <Route path="finance" element={<Finance />} />
+            <Route path="reports" element={<Reports />} />
             <Route path="users" element={<Users />} />
             <Route path="audit" element={<Audit />} />
             <Route path="settings" element={<Settings />} />

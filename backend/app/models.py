@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 
 from sqlalchemy import (
-    JSON, Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, Numeric, String, Text,
+    JSON, Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, LargeBinary, Numeric, String, Text,
     UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -63,6 +63,13 @@ class Organization(TimestampMixin, Base):
     invoice_terms: Mapped[str | None] = mapped_column(Text)
     payment_instructions: Mapped[str | None] = mapped_column(Text)
     round_invoices_to_rupee: Mapped[bool] = mapped_column(Boolean, default=False)
+    prices_include_tax_default: Mapped[bool] = mapped_column(Boolean, default=False)
+    logo: Mapped[bytes | None] = mapped_column(LargeBinary)
+    logo_mime: Mapped[str | None] = mapped_column(String(20))
+
+    @property
+    def has_logo(self) -> bool:
+        return self.logo is not None
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
@@ -153,6 +160,8 @@ class Product(TimestampMixin, Base):
     selling_price: Mapped[Decimal] = mapped_column(MONEY, default=Decimal("0"))
     gst_rate: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
     min_stock: Mapped[Decimal] = mapped_column(QTY, default=Decimal("0"))
+    # Moving-average cost across all locations, updated on purchase receipts. Used for COGS.
+    avg_cost: Mapped[Decimal] = mapped_column(MONEY, default=Decimal("0"))
     track_serial: Mapped[bool] = mapped_column(Boolean, default=False)
     warranty_months: Mapped[int | None] = mapped_column(Integer)
     is_service: Mapped[bool] = mapped_column(Boolean, default=False)

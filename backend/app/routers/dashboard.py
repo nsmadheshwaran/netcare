@@ -1,4 +1,4 @@
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Query
@@ -6,12 +6,14 @@ from sqlalchemy import func, select
 
 from ..deps import OrgContext, require
 from ..models import AuditLog, Customer, Product, StockLevel, StockMovement, User
+from ..models_finance import FinanceEntry
 from ..models_trade import Payment, PurchaseInvoice, SalesInvoice
+from ..services.timeutil import BUSINESS_TZ, today as local_today
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
 # Modules whose metrics are not built yet. Reported explicitly so the UI never shows fake numbers.
-PENDING_MODULES = ["expenses", "service", "network", "endpoint_security"]
+PENDING_MODULES = ["service", "network", "endpoint_security"]
 LIVE_SALES = ["issued", "partially_paid", "paid"]
 
 
@@ -26,7 +28,7 @@ def period_range(period: str, today: date) -> tuple[datetime, datetime]:
         start = today.replace(month=(today.month - 1) // 3 * 3 + 1, day=1)
     else:  # Indian financial year: 1 April
         start = date(today.year if today.month >= 4 else today.year - 1, 4, 1)
-    tz = timezone.utc
+    tz = BUSINESS_TZ
     return datetime.combine(start, time.min, tz), datetime.combine(today + timedelta(days=1), time.min, tz)
 
 
@@ -35,7 +37,7 @@ def summary(ctx: OrgContext = Depends(require("dashboard.view")),
             period: str = Query("month", pattern="^(day|week|month|quarter|year)$"),
             location_id: int | None = None):
     db, org = ctx.db, ctx.org_id
-    start, end = period_range(period, datetime.now(timezone.utc).date())
+    start, end = period_range(period, local_today())
 
     active_customers = select(Customer).where(Customer.organization_id == org, Customer.archived_at.is_(None))
     total_customers = db.scalar(select(func.count()).select_from(active_customers.subquery()))
@@ -73,7 +75,7 @@ def summary(ctx: OrgContext = Depends(require("dashboard.view")),
         .group_by(func.date(Customer.created_at)).order_by(func.date(Customer.created_at))).all()
 
     d0, d1 = start.date(), (end - timedelta(days=1)).date()
-    today = datetime.now(timezone.utc).date()
+    today = local_today()
 
     def inv_sum(col, *conds):
         q = select(func.coalesce(func.sum(col), 0)).where(SalesInvoice.organization_id == org,
@@ -101,6 +103,10 @@ def summary(ctx: OrgContext = Depends(require("dashboard.view")),
         return Decimal(db.scalar(select(func.coalesce(func.sum(Payment.amount), 0)).where(
             Payment.organization_id == org, Payment.direction == direction, Payment.voided_at.is_(None),
             Payment.payment_date >= d0, Payment.payment_date <= d1)))
+
+    expenses_period = Decimal(db.scalar(select(func.coalesce(func.sum(FinanceEntry.amount), 0)).where(
+        FinanceEntry.organization_id == org, FinanceEntry.kind == "expense", FinanceEntry.voided_at.is_(None),
+        FinanceEntry.entry_date >= d0, FinanceEntry.entry_date <= d1)))
 
     sales_daily = db.execute(
         select(SalesInvoice.invoice_date, func.sum(SalesInvoice.total))
@@ -141,6 +147,7 @@ def summary(ctx: OrgContext = Depends(require("dashboard.view")),
             "billed_in_period": str(purchases_period), "payable_outstanding": str(payable),
             "paid_in_period": str(pay_sum("out")),
         },
+        "expenses": {"paid_in_period": str(expenses_period)},
         "trends": {
             "sales_per_day": [{"date": str(d), "total": str(v)} for d, v in sales_daily],
             "purchases_per_day": [{"date": str(d), "total": str(v)} for d, v in purchase_daily],

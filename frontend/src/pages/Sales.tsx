@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { Ban, CheckCircle2, FileInput, IndianRupee, Plus, Send, Undo2 } from "lucide-react";
-import { api, inr, qty, type Page } from "../api";
+import { Ban, CheckCircle2, FileInput, IndianRupee, Plus, Printer, Receipt, Send, Undo2 } from "lucide-react";
+import { api, inr, openPdf, qty, type Page } from "../api";
 import { useAuth } from "../auth";
 import {
   blankLine, LineEditor, linesFrom, linesPayload, LinesTable, PartySelect, StatusBadge, today, TotalsBox,
@@ -34,6 +34,7 @@ function SalesDocForm({ kind, initial, onSaved, onCancel }: { kind: "invoice" | 
     due: (kind === "invoice" ? inv?.due_date : qt?.valid_until) ?? "",
     place_of_supply: initial?.place_of_supply ?? "", document_discount: initial?.document_discount ?? "0",
     notes: initial?.notes ?? "", terms: initial?.terms ?? "",
+    prices_include_tax: initial ? initial.prices_include_tax : null,
   });
   const [lines, setLines] = useState<Line[]>(initial ? linesFrom(initial.lines) : [blankLine()]);
   const [error, setError] = useState<string | null>(null);
@@ -45,7 +46,7 @@ function SalesDocForm({ kind, initial, onSaved, onCancel }: { kind: "invoice" | 
     e.preventDefault();
     setBusy(true); setError(null);
     const common = { customer_id: Number(f.customer_id), place_of_supply: f.place_of_supply || null, document_discount: f.document_discount || "0",
-      notes: f.notes || null, terms: f.terms || null, lines: linesPayload(lines) };
+      notes: f.notes || null, terms: f.terms || null, lines: linesPayload(lines), prices_include_tax: f.prices_include_tax };
     const body = kind === "invoice"
       ? { ...common, location_id: Number(f.location_id), invoice_date: f.date, due_date: f.due || null, ...(initial ? {} : { idempotency_key: idem }) }
       : { ...common, quote_date: f.date, valid_until: f.due || null };
@@ -66,6 +67,12 @@ function SalesDocForm({ kind, initial, onSaved, onCancel }: { kind: "invoice" | 
         <Field label={kind === "invoice" ? "Due date (blank = on receipt)" : "Valid until"}><input className="input" type="date" value={f.due} onChange={set("due")} /></Field>
         <Field label="Place of supply (state code)"><input className="input" pattern="\d{2}" maxLength={2} placeholder="From customer" value={f.place_of_supply} onChange={set("place_of_supply")} /></Field>
       </div>
+      <label className="flex items-center gap-2 text-sm">
+        <select className="input !w-auto" value={f.prices_include_tax === null ? "" : String(f.prices_include_tax)} aria-label="Price basis"
+          onChange={(e) => setF({ ...f, prices_include_tax: e.target.value === "" ? null : e.target.value === "true" })}>
+          <option value="">Prices: business default</option><option value="false">Prices exclude GST</option><option value="true">Prices include GST (MRP)</option>
+        </select>
+      </label>
       <LineEditor lines={lines} onChange={setLines} />
       <div className="grid gap-3 sm:grid-cols-3">
         <Field label="Invoice-level discount ₹"><input className="input" type="number" step="0.01" min="0" value={f.document_discount} onChange={set("document_discount")} /></Field>
@@ -173,6 +180,10 @@ function InvoiceDetail({ id, onChanged, onClose }: { id: number; onChanged: () =
           <div className="text-sm text-slate-500">{inv.customer_name} · {inv.invoice_date}{inv.due_date ? ` · due ${inv.due_date}` : ""}</div>
           {inv.cancel_reason && <div className="text-sm text-red-600">Cancelled: {inv.cancel_reason}</div>}
         </div>
+        <div className="flex flex-wrap gap-2">
+          <button className="btn-ghost" onClick={() => openPdf(`/invoices/${inv.id}/pdf`).catch((e) => setErr(e.message))}><Printer size={15} /> {inv.status === "draft" ? "Preview" : "Print A4"}</button>
+          {inv.status !== "draft" && <button className="btn-ghost" onClick={() => openPdf(`/invoices/${inv.id}/pdf?layout=thermal`).catch((e) => setErr(e.message))}><Receipt size={15} /> Thermal</button>}
+        </div>
         {can("sales.edit") && <div className="flex flex-wrap gap-2">
           {inv.status === "draft" && <>
             <button className="btn-ghost" onClick={() => setMode("edit")}>Edit</button>
@@ -274,6 +285,7 @@ function QuoteDetail({ id, onChanged, onClose }: { id: number; onChanged: () => 
           <div className="text-lg font-semibold">{q.number} <StatusBadge s={q.status} /></div>
           <div className="text-sm text-slate-500">{q.customer_name} · {q.quote_date}{q.valid_until ? ` · valid until ${q.valid_until}` : ""}</div>
         </div>
+        <button className="btn-ghost" onClick={() => openPdf(`/quotations/${q.id}/pdf`).catch((e) => setErr(e.message))}><Printer size={15} /> Print</button>
         {can("sales.edit") && open && <div className="flex flex-wrap gap-2">
           {q.status !== "accepted" && <button className="btn-ghost" onClick={() => setEdit(true)}>Edit</button>}
           {q.status === "draft" && <button className="btn-ghost" onClick={() => status("sent")}><Send size={15} /> Mark sent</button>}

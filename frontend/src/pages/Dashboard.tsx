@@ -61,6 +61,7 @@ export default function Dashboard() {
             <Stat label="Overdue from customers" value={inr(d.sales.receivable_overdue)} icon={AlertTriangle} tone="text-red-600" to="/sales" />
             <Stat label="You owe suppliers" value={inr(d.purchases.payable_outstanding)} icon={Wallet} tone="text-amber-600" to="/purchases" />
             <Stat label="Paid to suppliers in period" value={inr(d.purchases.paid_in_period)} icon={HandCoins} tone="text-slate-600" to="/payments" />
+            <Stat label="Expenses paid in period" value={inr(d.expenses.paid_in_period)} icon={Wallet} tone="text-red-600" to="/expenses" />
           </div>
 
           <div className="card">

@@ -15,6 +15,7 @@ from ..schemas_trade import (
     QuotationStatusIn,
 )
 from ..services import billing, inventory
+from ..services.timeutil import today
 from ..services.trade import (
     active_customer, active_location, apply_totals, balance, build_lines, display_status, get_owned,
     interstate_for, refresh_sales_status,
@@ -24,11 +25,17 @@ router = APIRouter(tags=["sales"])
 ZERO = Decimal("0")
 
 
-def _totals_for(ctx: OrgContext, customer: Customer, lines, document_discount, place_of_supply):
-    pos = place_of_supply or customer.state_code
+def _inclusive(ctx: OrgContext, body) -> bool:
+    return ctx.org.prices_include_tax_default if body.prices_include_tax is None else body.prices_include_tax
+
+
+def _totals_for(ctx: OrgContext, customer: Customer, body):
+    pos = body.place_of_supply or customer.state_code
     inter = interstate_for(ctx, pos)
-    totals = billing.compute(build_lines(ctx, lines), interstate=inter, document_discount=document_discount,
-                             round_to_rupee=ctx.org.round_invoices_to_rupee)
+    doc_date = getattr(body, "invoice_date", None) or getattr(body, "quote_date", None)
+    totals = billing.compute(build_lines(ctx, body.lines, on=doc_date), interstate=inter,
+                             document_discount=body.document_discount,
+                             round_to_rupee=ctx.org.round_invoices_to_rupee, prices_include_tax=_inclusive(ctx, body))
     return totals, inter, pos
 
 
@@ -38,16 +45,17 @@ def _q_out(ctx: OrgContext, q: Quotation) -> QuotationOut:
     o.customer_name = ctx.db.get(Customer, q.customer_id).name
     o.converted_invoice_id = ctx.db.scalar(select(SalesInvoice.id).where(SalesInvoice.quotation_id == q.id)
                                            .where(SalesInvoice.status != "cancelled"))
-    if q.status in ("draft", "sent") and q.valid_until and q.valid_until < date.today():
+    if q.status in ("draft", "sent") and q.valid_until and q.valid_until < today():
         o.status = "expired"
     return o
 
 
 def _fill_quote(ctx: OrgContext, q: Quotation, body: QuotationIn):
     customer = active_customer(ctx, body.customer_id)
-    totals, inter, pos = _totals_for(ctx, customer, body.lines, body.document_discount, body.place_of_supply)
+    totals, inter, pos = _totals_for(ctx, customer, body)
     for f in ("customer_id", "quote_date", "valid_until", "document_discount", "notes", "terms"):
         setattr(q, f, getattr(body, f))
+    q.prices_include_tax = _inclusive(ctx, body)
     apply_totals(q, totals, QuotationLine, interstate=inter, place_of_supply=pos)
 
 
@@ -116,8 +124,9 @@ def convert_quote(qid: int, location_id: int, ctx: OrgContext = Depends(require(
     lines = [LineIn(product_id=li.product_id, description=li.description, quantity=li.quantity,
                     unit_price=li.unit_price, tax_rate=li.tax_rate, line_discount_pct=li.line_discount_pct)
              for li in q.lines]
-    body = InvoiceIn(customer_id=q.customer_id, location_id=location_id, invoice_date=date.today(),
+    body = InvoiceIn(customer_id=q.customer_id, location_id=location_id, invoice_date=today(),
                      place_of_supply=q.place_of_supply, document_discount=q.document_discount, notes=q.notes,
+                     prices_include_tax=q.prices_include_tax,
                      terms=q.terms, lines=lines, idempotency_key=f"quotation:{q.id}")
     existing = ctx.db.scalar(select(SalesInvoice).where(SalesInvoice.organization_id == ctx.org_id,
                                                         SalesInvoice.idempotency_key == body.idempotency_key))
@@ -143,9 +152,10 @@ def _inv_out(ctx: OrgContext, inv: SalesInvoice) -> InvoiceOut:
 def _fill_invoice(ctx: OrgContext, inv: SalesInvoice, body: InvoiceIn):
     customer = active_customer(ctx, body.customer_id)
     active_location(ctx, body.location_id)
-    totals, inter, pos = _totals_for(ctx, customer, body.lines, body.document_discount, body.place_of_supply)
+    totals, inter, pos = _totals_for(ctx, customer, body)
     for f in ("customer_id", "location_id", "invoice_date", "due_date", "document_discount", "notes", "terms"):
         setattr(inv, f, getattr(body, f))
+    inv.prices_include_tax = _inclusive(ctx, body)
     inv.terms = inv.terms or ctx.org.invoice_terms
     apply_totals(inv, totals, SalesInvoiceLine, interstate=inter, place_of_supply=pos)
 
@@ -171,7 +181,7 @@ def list_invoices(ctx: OrgContext = Depends(require("sales.view")), status: str 
     if unpaid or overdue:
         base = base.where(SalesInvoice.status.in_(["issued", "partially_paid"]))
     if overdue:
-        base = base.where(SalesInvoice.due_date < date.today())
+        base = base.where(SalesInvoice.due_date < today())
     if customer_id:
         base = base.where(SalesInvoice.customer_id == customer_id)
     if date_from:
@@ -225,9 +235,11 @@ def issue_invoice(inv_id: int, ctx: OrgContext = Depends(require("sales.edit")))
     inv.number = billing.next_number(ctx.db, ctx.org_id, "sales_invoice", inv.invoice_date)
     for li in inv.lines:
         if li.product_id and not ctx.db.get(Product, li.product_id).is_service:
-            inventory.apply_movement(ctx.db, org_id=ctx.org_id, user_id=ctx.user.id, product_id=li.product_id,
-                                     location_id=inv.location_id, movement_type="sale", quantity=li.quantity,
-                                     reference=inv.number, idempotency_key=f"inv{inv.id}:l{li.id}:sale")
+            mv = inventory.apply_movement(ctx.db, org_id=ctx.org_id, user_id=ctx.user.id,
+                                          product_id=li.product_id, location_id=inv.location_id,
+                                          movement_type="sale", quantity=li.quantity, reference=inv.number,
+                                          idempotency_key=f"inv{inv.id}:l{li.id}:sale")
+            li.unit_cost = mv.unit_cost
     inv.status = "issued"
     inv.issued_at = utcnow()
     refresh_sales_status(inv)  # zero-value invoices are immediately paid
@@ -250,6 +262,8 @@ def cancel_invoice(inv_id: int, body: CancelIn, ctx: OrgContext = Depends(requir
                 inventory.apply_movement(ctx.db, org_id=ctx.org_id, user_id=ctx.user.id, product_id=li.product_id,
                                          location_id=inv.location_id, movement_type="sale_cancel",
                                          quantity=li.quantity, reference=f"Cancel {inv.number}",
+                                         unit_cost=inventory.sale_cost(ctx.db, ctx.org_id,
+                                                                       f"inv{inv.id}:l{li.id}:sale"),
                                          idempotency_key=f"inv{inv.id}:l{li.id}:cancel")
     inv.status = "cancelled"
     inv.cancelled_at = utcnow()
@@ -303,7 +317,9 @@ def create_credit_note(inv_id: int, body: CreditNoteIn, ctx: OrgContext = Depend
             mv_id = inventory.apply_movement(ctx.db, org_id=ctx.org_id, user_id=ctx.user.id,
                                              product_id=li.product_id, location_id=inv.location_id,
                                              movement_type="customer_return", quantity=r.quantity,
-                                             reference=cn.number).id
+                                             reference=cn.number,
+                                             unit_cost=inventory.sale_cost(ctx.db, ctx.org_id,
+                                                                           f"inv{inv.id}:l{li.id}:sale")).id
         li.returned_quantity = returned + r.quantity
         cn.lines.append(CreditNoteLine(sales_invoice_line_id=li.id, quantity=r.quantity, taxable_value=taxable,
                                        tax_amount=tax, amount=taxable + tax, stock_movement_id=mv_id))

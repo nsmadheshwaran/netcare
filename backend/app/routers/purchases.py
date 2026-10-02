@@ -33,7 +33,7 @@ def _po_out(po: PurchaseOrder) -> PurchaseOrderOut:
 def _fill_po(ctx: OrgContext, po: PurchaseOrder, body: PurchaseOrderIn):
     supplier = active_supplier(ctx, body.supplier_id)
     active_location(ctx, body.location_id)
-    lines = build_lines(ctx, body.lines, price_field="purchase_price")
+    lines = build_lines(ctx, body.lines, price_field="purchase_price", on=body.order_date)
     for li in lines:
         if ctx.db.get(Product, li.product_id).is_service:
             raise HTTPException(422, f"{li.description} is a service and cannot be purchased into stock")
@@ -213,7 +213,8 @@ def create_bill(body: PurchaseInvoiceIn, ctx: OrgContext = Depends(require("purc
         raise HTTPException(409, f"Bill {body.supplier_invoice_number} from this supplier is already recorded")
     pos = body.place_of_supply or supplier.state_code
     inter = interstate_for(ctx, pos)
-    totals = billing.compute(build_lines(ctx, body.lines, price_field="purchase_price"), interstate=inter)
+    totals = billing.compute(build_lines(ctx, body.lines, price_field="purchase_price", on=body.invoice_date),
+                             interstate=inter)
     due = body.due_date
     if due is None and supplier.payment_terms_days is not None:
         from datetime import timedelta

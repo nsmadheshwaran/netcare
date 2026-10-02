@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173"
     login_max_attempts: int = 5
     login_window_seconds: int = 300
+    # Business-local time for "today" and report dates. India has no DST, so a fixed offset is exact.
+    utc_offset_minutes: int = 330
 
     @property
     def cors_origin_list(self) -> list[str]:

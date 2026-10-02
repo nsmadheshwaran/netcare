@@ -98,7 +98,8 @@ def list_products(ctx: OrgContext = Depends(require("products.view")),
 def create_product(body: ProductIn, ctx: OrgContext = Depends(require("products.edit"))):
     _check_category(ctx, body.category_id)
     _check_sku(ctx, body.sku)
-    p = Product(organization_id=ctx.org_id, **body.model_dump())
+    # Until goods are received at a real cost, value stock at the stated purchase price.
+    p = Product(organization_id=ctx.org_id, avg_cost=body.purchase_price, **body.model_dump())
     ctx.db.add(p)
     ctx.db.flush()
     ctx.audit("create", "product", p.id, {"sku": p.sku, "name": p.name})

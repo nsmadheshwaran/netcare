@@ -66,6 +66,22 @@ Customer site: (future) Windows agent --outbound HTTPS, per-agent revocable toke
 - **What changes balances:** issuing an invoice creates a receivable; payment allocations and credit notes
   reduce it. Supplier bills create payables; allocations and purchase returns reduce them.
 
+## Finance and reports (Phase 3)
+- **Costing.** `services/inventory.apply_movement` locks the product row. A costed inflow (receipt, stock-in
+  with a cost, return, cancellation) updates `avg_cost` as:
+
+  `(on_hand × avg + qty × cost) / (on_hand + qty)`
+
+  Outflows and transfers are valued at the current average. Issuing an invoice copies the sale cost onto the
+  line, so profit for a past period never changes when later purchases change the average.
+- **Reports.** `services/reports.py` builds an `export.Report` (title, columns, rows, totals, sections, notes,
+  draft flag) from persisted records only. `services/export.py` renders any report as CSV (with a UTF-8 BOM,
+  formula-safe), Excel or PDF. Adding a report means writing one function and adding it to `CATALOG`.
+- **PDFs.** `services/pdf_docs.py` builds the invoice, quotation, thermal and receipt layouts with ReportLab.
+  All user text is XML-escaped before it reaches ReportLab markup.
+- **Dates.** `services/timeutil.today()` returns the business-local date (UTC+05:30 by default, set by
+  `NETCARE_UTC_OFFSET_MINUTES`). Timestamps are stored in UTC; document dates are the business's own dates.
+
 ## Frontend layout (`frontend/src`)
 - `api.ts`: fetch wrapper and error formatting
 - `auth.tsx`: session and permissions context

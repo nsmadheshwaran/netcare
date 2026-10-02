@@ -10,7 +10,9 @@ from ..models import Customer, utcnow
 from ..models_trade import Payment, PaymentAllocation, PurchaseInvoice, SalesInvoice, Supplier
 from ..schemas import Page
 from ..schemas_trade import AllocationIn, AllocationOut, CancelIn, PaymentIn, PaymentOut
+from ..models_finance import MoneyAccount
 from ..services import billing
+from ..services.finance import resolve_account
 from ..services.trade import (
     active_customer, active_supplier, balance, get_owned, refresh_purchase_status, refresh_sales_status,
 )
@@ -23,6 +25,7 @@ def payment_out(ctx: OrgContext, p: Payment) -> PaymentOut:
     o = PaymentOut.model_validate(p)
     party = ctx.db.get(Customer, p.customer_id) if p.customer_id else ctx.db.get(Supplier, p.supplier_id)
     o.party_name = party.name if party else None
+    o.account_name = ctx.db.get(MoneyAccount, p.account_id).name if p.account_id else None
     o.unallocated = ZERO if p.voided_at else Decimal(p.amount) - sum((Decimal(a.amount) for a in p.allocations), ZERO)
     allocs = []
     for a in p.allocations:
@@ -102,7 +105,8 @@ def record_payment(body: PaymentIn, ctx: OrgContext = Depends(require("payments.
         active_customer(ctx, body.customer_id)
     else:
         active_supplier(ctx, body.supplier_id)
-    p = Payment(organization_id=ctx.org_id, direction="in" if incoming else "out",
+    account = resolve_account(ctx, body.account_id, body.method)
+    p = Payment(organization_id=ctx.org_id, direction="in" if incoming else "out", account_id=account.id,
                 customer_id=body.customer_id, supplier_id=body.supplier_id, payment_date=body.payment_date,
                 amount=body.amount, method=body.method, reference=body.reference, notes=body.notes,
                 idempotency_key=body.idempotency_key, created_by=ctx.user.id,

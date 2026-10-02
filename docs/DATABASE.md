@@ -37,6 +37,19 @@ Document tables share the same money columns: `subtotal`, `discount_total`, `tax
 store `taxable_value`, the tax split and `line_total`. The server computes and stores all of these, so a
 document never changes if a product price or tax rate changes later.
 
+### Migration `0003` (Phase 3)
+| Table / column | Purpose |
+|---|---|
+| money_accounts | Cash, bank and other accounts; opening balance; one default per kind |
+| finance_categories | Expense and income categories (common ones are created on first use) |
+| finance_entries | Expenses, other income and transfers; `tax_amount` is GST the business can claim; voided, never deleted |
+| tax_rates | Versioned GST rate master: `effective_from`/`effective_to`, never updated in place |
+| products.avg_cost | Moving-average cost; existing products were seeded from `purchase_price` |
+| sales_invoice_lines.unit_cost | Cost captured when the invoice was issued; empty for invoices issued before 0003 |
+| payments.account_id | Which account the money went into or came out of |
+| organizations.logo, logo_mime, prices_include_tax_default | Branding and pricing default |
+| quotations / sales_invoices.prices_include_tax | Whether the line prices included GST |
+
 Every business table has an `organization_id` column with `ON DELETE CASCADE` to its organization.
 
 ## Migrations

@@ -84,6 +84,7 @@ class OrgIn(BaseModel):
     invoice_terms: str | None = None
     payment_instructions: str | None = None
     round_invoices_to_rupee: bool = False
+    prices_include_tax_default: bool = False
     # Applies to sequences started after the change (i.e. doc types not yet used this financial year).
     numbering_prefixes: dict[str, str] | None = None
     _g = field_validator("gstin")(classmethod(lambda cls, v: _gstin(v)))
@@ -116,6 +117,8 @@ class OrgOut(ORM):
     invoice_terms: str | None
     payment_instructions: str | None
     round_invoices_to_rupee: bool
+    prices_include_tax_default: bool
+    has_logo: bool = False
     numbering_prefixes: dict[str, str] | None
 
 

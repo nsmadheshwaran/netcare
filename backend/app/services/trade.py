@@ -47,8 +47,11 @@ def active_location(ctx: OrgContext, location_id: int) -> Location:
     return loc
 
 
-def build_lines(ctx: OrgContext, lines, *, price_field: str = "selling_price") -> list[billing.LineInput]:
-    """Resolve product defaults (description, price, GST rate, HSN) and validate ownership."""
+def build_lines(ctx: OrgContext, lines, *, price_field: str = "selling_price",
+                on: date | None = None) -> list[billing.LineInput]:
+    """Resolve product defaults (description, price, GST rate, HSN) and validate ownership.
+    With `on`, each GST rate must be in the organization's rate master on that date (if one is configured)."""
+    from ..routers.finance import rate_in_effect
     out = []
     for li in lines:
         product = None
@@ -58,6 +61,9 @@ def build_lines(ctx: OrgContext, lines, *, price_field: str = "selling_price") -
                 raise HTTPException(422, f"Product {product.sku} is archived")
         price = li.unit_price if li.unit_price is not None else getattr(product, price_field)
         rate = li.tax_rate if li.tax_rate is not None else (product.gst_rate if product and product.gst_rate else ZERO)
+        if on is not None and rate_in_effect(ctx, Decimal(rate), on) is False:
+            raise HTTPException(422, f"GST rate {Decimal(rate).normalize()}% is not in your tax rate list on {on}. "
+                                     "Add it under Settings > Tax rates, or correct the line.")
         out.append(billing.LineInput(
             description=li.description or product.name, quantity=li.quantity, unit_price=Decimal(price),
             tax_rate=Decimal(rate), line_discount_pct=getattr(li, "line_discount_pct", ZERO) or ZERO,
@@ -108,7 +114,8 @@ def refresh_purchase_status(bill: PurchaseInvoice) -> None:
 
 
 def display_status(doc, today: date | None = None) -> str:
-    today = today or date.today()
+    from .timeutil import today as local_today
+    today = today or local_today()
     if doc.status in ("issued", "partially_paid", "open") and doc.due_date and doc.due_date < today \
             and balance(doc) > 0:
         return "overdue"

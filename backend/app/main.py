@@ -6,8 +6,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_settings
 from .routers import (
-    audit, auth, customers, dashboard, health, inventory, organizations, payments, products, purchases, sales,
-    suppliers,
+    audit, auth, customers, dashboard, documents, finance, health, inventory, organizations, payments, products,
+    purchases, reports, sales, suppliers,
 )
 
 settings = get_settings()
@@ -34,6 +34,6 @@ async def access_log(request: Request, call_next):
 
 
 app.include_router(health.router)
-for r in (auth, organizations, customers, products, inventory, suppliers, purchases, sales, payments, dashboard,
-          audit):
+for r in (auth, organizations, customers, products, inventory, suppliers, purchases, sales, payments, finance,
+          reports, documents, dashboard, audit):
     app.include_router(r.router, prefix="/api/v1")

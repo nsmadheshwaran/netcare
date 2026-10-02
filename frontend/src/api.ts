@@ -53,6 +53,22 @@ export async function download(path: string, filename: string) {
   URL.revokeObjectURL(url);
 }
 
+/** Open an authenticated PDF in a new tab for viewing/printing. The tab is opened before the request
+ *  so popup blockers treat it as a direct result of the click. */
+export async function openPdf(path: string) {
+  const win = window.open("", "_blank");
+  try {
+    const blob = await api<Blob>(path);
+    const url = URL.createObjectURL(blob);
+    if (win) win.location.href = url;
+    else window.location.href = url;
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  } catch (e) {
+    win?.close();
+    throw e;
+  }
+}
+
 export const inr = (v: string | number) =>
   new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(Number(v));
 export const qty = (v: string | number) => new Intl.NumberFormat("en-IN", { maximumFractionDigits: 3 }).format(Number(v));

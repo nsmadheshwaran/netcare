@@ -5,9 +5,9 @@
 A multi-tenant business management platform for Indian small businesses: computer shops, CCTV installers,
 IT service providers, electronics retailers, schools and SMBs.
 
-> **Status: Phase 2 (business management) complete.** Foundation plus suppliers, purchasing, quotations,
-> sales invoices, payments and returns work end to end. Expenses, finance reports, PDF invoices, service,
-> IT monitoring, endpoint security and the data organizer are **not built yet**. They show as "Planned" in
+> **Status: Phase 3 (finance, GST support, documents) complete.** Foundation, trade workflows, expenses,
+> accounts, reports with PDF/Excel/CSV export, and printable invoices work end to end. Service, employees,
+> document storage, IT monitoring, endpoint security and the data organizer are **not built yet**. They show as "Planned" in
 > the UI and appear on the dashboard as "Not yet available", with no placeholder numbers.
 
 ## What works today
@@ -25,6 +25,11 @@ IT service providers, electronics retailers, schools and SMBs.
 | Sales | Quotations (sent, accepted, rejected, expiry) converted to draft invoices; invoices with line and invoice-level discounts; issuing assigns the number and deducts stock in one transaction; cancellation restores stock; credit notes for partial or full returns, with or without restocking |
 | Payments | Cash, UPI, bank transfer, card, cheque, other; allocation across invoices or bills; advances applied later; void with reason (keeps the record) |
 | Tax (records only) | Per-line GST rate and HSN/SAC; CGST/SGST or IGST from your state code vs. the place of supply; optional rounding to the rupee |
+| Finance | Cash/bank accounts with opening balances, expenses and other income by category (GST you can claim recorded separately), transfers between accounts, void with reason |
+| Costing | Moving-average cost per product, captured on each invoice line at issue; returns go back in at their original cost |
+| Reports | Profit and loss summary, cash flow by account, daily closing, sales/purchase registers, expenses, receivables and payables ageing, stock valuation, draft GST summary; each as screen, PDF, Excel or CSV |
+| Documents | A4 GST invoice and quotation (logo, HSN, CGST/SGST or IGST, amount in words, payment instructions), 80 mm thermal receipt, payment receipt/voucher |
+| Tax | Versioned GST rate master (retire and add, never edit) enforced on document dates once configured; tax-inclusive (MRP) pricing per invoice |
 | Numbering | Gap-free, per organization and financial year (e.g. `INV/2026-27/00001`), configurable prefixes, row-locked |
 | Dashboard | Period (day/week/month/quarter/FY) and location filters; invoiced, received, receivables (and overdue), payables, sales vs purchases chart; customer counts, stock valuation at cost, low/out-of-stock, activity chart, recent activity, all from the database |
 | Audit | Every create/update/archive/stock change/import/export is logged with the user and IP address |
@@ -66,7 +71,8 @@ Local dev uses SQLite by default (`netcare_dev.db`). For PostgreSQL, set
 - [ ] Phase 1 follow-ups: emailed invites and password reset (needs an SMTP provider), refresh tokens, customer profile page, product images, barcode generation, verified PostgreSQL CI run
 - [x] **Phase 2, business:** suppliers, purchase orders → goods receipt → supplier bill, quotations → invoices, payments with allocation, credit notes, purchase returns, FY numbering
 - [ ] Phase 2 follow-ups: sales orders (deliberately skipped; quotation → invoice covers current needs), serial-number capture at sale, tax-inclusive pricing, per-location user restrictions
-- [ ] **Phase 3, finance and GST:** expenses, cash/bank records, P&L and cash-flow summaries, versioned tax configuration, tax-inclusive prices, PDF invoices and receipts (ReportLab), Excel exports, accountant-ready tax summary
+- [x] **Phase 3, finance and GST:** expenses, accounts, P&L and cash flow, versioned tax rates, tax-inclusive prices, PDF invoices and receipts, Excel/CSV/PDF exports, draft GST summary
+- [ ] Phase 3 follow-ups: emailing invoices (needs an email provider), bank statement reconciliation, credit note PDF, GSTR-format exports (only after accountant validation)
 - [ ] **Phase 4:** service tickets, technicians, maintenance schedules, employees, tasks
 - [ ] **Phase 5:** documents (secure upload), analytics, report exports
 - [ ] **Phase 6:** device inventory, monitoring agent, uptime/latency, CCTV assets
@@ -82,5 +88,7 @@ Local dev uses SQLite by default (`netcare_dev.db`). For PostgreSQL, set
 - The suite has been tested on SQLite. The PostgreSQL code paths (row locks, migrations) are written for
   PostgreSQL but have **not yet run against a real PostgreSQL server**. This matters more now that invoice
   numbering and stock depend on row locks. See [TESTING](docs/TESTING.md).
+- The profit and loss summary is an operating summary, not a statutory statement. Invoices issued before
+  Phase 3 have no recorded cost, and the report says how many lines are affected.
 - GST amounts are calculated for record-keeping. They are not a compliance determination, and there is no
   e-invoicing (IRN) or e-way bill support.

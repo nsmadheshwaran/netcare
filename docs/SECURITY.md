@@ -15,6 +15,12 @@
   ORM parameterises all SQL.
 - **CSV:** imports are limited to 2 MB, UTF-8 only, and preview first. Exports prefix cells starting with
   `= + - @` to block spreadsheet formula injection.
+- **Uploads (logo):** limited to 300 KB and 4000 × 4000 pixels. The type is detected from the file's bytes
+  (PNG/JPEG signatures), never from its name or declared type, and the image must decode. Logos are stored in
+  the database and served only to signed-in members of that business.
+- **PDFs:** user-entered text is XML-escaped before ReportLab renders it, so names like `A & B <Traders>`
+  cannot break or inject markup.
+- **Reports:** limited to a three-year span per request to bound load; every report run is audited.
 - **Headers:** `X-Content-Type-Options`, `X-Frame-Options: DENY`, and `Referrer-Policy` are set. CORS is limited
   to configured origins.
 - **Audit log:** creates, updates, archives, stock changes, imports, exports and membership changes are logged

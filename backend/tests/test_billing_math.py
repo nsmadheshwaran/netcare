@@ -61,3 +61,17 @@ def test_fiscal_year_and_state():
     assert fiscal_year(date(2026, 4, 1)) == "2026-27"
     assert is_interstate("33", "29") and not is_interstate("33", "33")
     assert not is_interstate(None, "29") and not is_interstate("33", None)
+
+
+def test_tax_inclusive_prices():
+    # MRP-style: Rs 1180 incl. 18% GST -> taxable 1000, tax 180, total stays 1180
+    t = compute([L("1", "1180", "18")], interstate=False, prices_include_tax=True)
+    assert (t.taxable_total, t.cgst_total + t.sgst_total, t.total) == (D("1000.00"), D("180.00"), D("1180.00"))
+    # Awkward amount: total must equal the inclusive price exactly, never drift by a paisa
+    t = compute([L("3", "99.99", "18"), L("1", "10", "5")], interstate=True, prices_include_tax=True,
+                document_discount=D("7.77"))
+    assert t.total == D("299.97") + D("10") - D("7.77")
+    assert t.taxable_total + t.igst_total == t.total
+    # Inclusive with line discount: 10% off 1180 = 1062 incl -> 900 taxable
+    t = compute([L("1", "1180", "18", disc="10")], interstate=False, prices_include_tax=True)
+    assert (t.taxable_total, t.total) == (D("900.00"), D("1062.00"))

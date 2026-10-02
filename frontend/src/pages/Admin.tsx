@@ -94,6 +94,82 @@ export function Audit() {
   );
 }
 
+function LogoCard({ hasLogo, onChange }: { hasLogo: boolean; onChange: () => void }) {
+  const [error, setError] = useState<string | null>(null);
+  const [v, setV] = useState(0);
+  const logo = useAsync(() => hasLogo ? api<Blob>("/organization/logo").then((b) => URL.createObjectURL(b)) : Promise.resolve(null), [hasLogo, v]);
+  async function upload(file: File) {
+    setError(null);
+    const fd = new FormData();
+    fd.append("file", file);
+    try { await api("/organization/logo", { method: "POST", body: fd }); setV(v + 1); onChange(); } catch (e: any) { setError(e.message); }
+  }
+  async function remove() {
+    try { await api("/organization/logo", { method: "DELETE" }); onChange(); } catch (e: any) { setError(e.message); }
+  }
+  return (
+    <div className="card">
+      <h3 className="mb-3 font-medium">Logo on invoices</h3>
+      <ErrorBanner message={error} />
+      <div className="flex items-center gap-4">
+        <div className="flex h-16 w-32 items-center justify-center rounded border border-dashed border-slate-300 dark:border-slate-700">
+          {logo.data ? <img src={logo.data} alt="Business logo" className="max-h-14 max-w-28 object-contain" /> : <span className="text-xs text-slate-400">No logo</span>}
+        </div>
+        <div className="space-y-2 text-sm">
+          <input type="file" accept="image/png,image/jpeg" onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} aria-label="Upload logo" />
+          <div className="text-xs text-slate-500">PNG or JPEG, up to 300 KB.</div>
+          {hasLogo && <button className="text-xs text-red-600 hover:underline" onClick={remove}>Remove logo</button>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+type Rate = { id: number; name: string; rate: string; effective_from: string; effective_to: string | null; active: boolean; notes: string | null };
+
+function TaxRatesCard({ editable }: { editable: boolean }) {
+  const [history, setHistory] = useState(false);
+  const rates = useAsync(() => api<Rate[]>(`/tax-rates?include_history=${history}`), [history]);
+  const [f, setF] = useState({ name: "", rate: "", effective_from: new Date().toLocaleDateString("en-CA"), notes: "" });
+  const [error, setError] = useState<string | null>(null);
+  async function add(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    try { await api("/tax-rates", { method: "POST", json: { ...f, notes: f.notes || null } }); setF({ ...f, name: "", rate: "", notes: "" }); rates.reload(); }
+    catch (err: any) { setError(err.message); }
+  }
+  async function retire(r: Rate) {
+    const effective_to = window.prompt(`Last day ${r.name} applies (YYYY-MM-DD):`, new Date().toLocaleDateString("en-CA"));
+    if (!effective_to) return;
+    const reason = window.prompt("Reason (e.g. notification number):");
+    if (!reason || reason.length < 3) return;
+    try { await api(`/tax-rates/${r.id}/retire`, { method: "POST", json: { effective_to, reason } }); rates.reload(); } catch (e: any) { setError(e.message); }
+  }
+  return (
+    <div className="card">
+      <div className="mb-2 flex items-center justify-between"><h3 className="font-medium">GST rates</h3>
+        <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={history} onChange={(e) => setHistory(e.target.checked)} /> Show retired</label></div>
+      <p className="mb-3 text-xs text-slate-500">Add only rates your accountant has confirmed. Once any rate is listed, documents may use only rates in effect on their date. Rates are never edited: retire the old one and add the new one, so past invoices stay explainable.</p>
+      <ErrorBanner message={error || rates.error} />
+      {!rates.data?.length ? <p className="mb-3 text-sm text-amber-700 dark:text-amber-400">No rates configured. Any rate can be used on documents.</p> : (
+        <table className="mb-3 w-full text-sm"><tbody>{rates.data.map((r) => (
+          <tr key={r.id} className="border-t border-slate-100 dark:border-slate-800">
+            <td className="td">{r.name}</td><td className="td text-right">{Number(r.rate)}%</td>
+            <td className="td text-xs text-slate-500">from {r.effective_from}{r.effective_to ? ` to ${r.effective_to}` : ""}</td>
+            <td className="td">{r.active ? <Badge tone="green">in effect</Badge> : <Badge>{r.effective_to ? "retired" : "future"}</Badge>}</td>
+            <td className="td text-right">{editable && !r.effective_to && <button className="text-xs text-red-600 hover:underline" onClick={() => retire(r)}>Retire</button>}</td>
+          </tr>))}</tbody></table>
+      )}
+      {editable && <form onSubmit={add} className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <input className="input" required placeholder="Name, e.g. GST 18%" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} aria-label="Rate name" />
+        <input className="input" required type="number" step="0.01" min="0" max="100" placeholder="Rate %" value={f.rate} onChange={(e) => setF({ ...f, rate: e.target.value })} aria-label="Rate percent" />
+        <input className="input" required type="date" value={f.effective_from} onChange={(e) => setF({ ...f, effective_from: e.target.value })} aria-label="Effective from" />
+        <button className="btn-ghost justify-center">Add rate</button>
+      </form>}
+    </div>
+  );
+}
+
 export function Settings() {
   const { can, refresh } = useAuth();
   const org = useAsync(() => api("/organization"), []);
@@ -109,7 +185,7 @@ export function Settings() {
   async function save(e: FormEvent) {
     e.preventDefault();
     setError(null); setMsg(null);
-    const { id: _id, currency: _c, ...body } = form;
+    const { id: _id, currency: _c, has_logo: _l, ...body } = form;
     for (const k of Object.keys(body)) if (body[k] === "") body[k] = null;
     try { await api("/organization", { method: "PUT", json: body }); setMsg("Saved."); refresh(); }
     catch (err: any) { setError(err.message); }
@@ -147,6 +223,7 @@ export function Settings() {
           <Field label="Default terms and conditions"><textarea className="input" rows={2} disabled={!editable} value={form.invoice_terms ?? ""} onChange={(e) => setF({ ...form, invoice_terms: e.target.value })} /></Field>
           <Field label="Payment instructions (bank / UPI details)"><textarea className="input" rows={2} disabled={!editable} value={form.payment_instructions ?? ""} onChange={(e) => setF({ ...form, payment_instructions: e.target.value })} /></Field>
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" disabled={!editable} checked={!!form.round_invoices_to_rupee} onChange={(e) => setF({ ...form, round_invoices_to_rupee: e.target.checked })} /> Round invoice totals to the nearest rupee</label>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" disabled={!editable} checked={!!form.prices_include_tax_default} onChange={(e) => setF({ ...form, prices_include_tax_default: e.target.checked })} /> Prices I enter include GST (MRP-style). Can be changed per invoice.</label>
           <div className="grid gap-3 sm:grid-cols-3">
             {[["sales_invoice", "Invoice prefix", "INV"], ["quotation", "Quotation prefix", "QT"], ["purchase_order", "PO prefix", "PO"]].map(([k, label, def]) => (
               <Field key={k} label={label}><input className="input" disabled={!editable} maxLength={12} pattern="[A-Za-z0-9-]+" placeholder={def}
@@ -161,6 +238,8 @@ export function Settings() {
           {editable && <button className="btn-primary">Save</button>}
         </form>
         <div className="space-y-4">
+          <LogoCard hasLogo={!!form.has_logo} onChange={() => { setF(null); org.reload(); }} />
+          <TaxRatesCard editable={editable} />
           <div className="card">
             <h3 className="mb-3 font-medium">Locations / warehouses</h3>
             <ul className="mb-3 space-y-1 text-sm">{locations.data?.map((l) => <li key={l.id}>• {l.name}</li>)}</ul>

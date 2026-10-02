@@ -46,6 +46,14 @@ X-Organization-ID: <organization_id from /auth/me>
 | POST /invoices/{id}/issue, /cancel, /credit-notes | sales.edit |
 | GET /credit-notes, GET /customers/{id}/account | sales.view |
 | GET/POST /payments, GET /payments/{id}, POST .../allocate, POST .../void | payments.view, payments.edit |
+| GET/POST /accounts, PATCH /accounts/{id} | finance.view, finance.manage |
+| GET/POST /finance-categories | expenses.view, finance.manage |
+| GET/POST /finance-entries, POST .../void (kind: expense needs expenses.edit; income and transfer need finance.manage) | expenses.view |
+| GET /tax-rates, POST /tax-rates, POST /tax-rates/{id}/retire | products.view, org.manage |
+| GET /reports, GET /reports/{key}?format=json,csv,xlsx,pdf | reports.view |
+| GET /invoices/{id}/pdf?layout=a4,thermal, GET /quotations/{id}/pdf | sales.view |
+| GET /payments/{id}/pdf | payments.view |
+| POST, GET, DELETE /organization/logo | org.manage (GET: any member) |
 | GET /dashboard/summary?period=day,week,month,quarter,year&location_id= | dashboard.view |
 | GET /audit-logs | audit.view |
 | GET /health, GET /ready | public |
@@ -90,6 +98,15 @@ Document rules:
   credit note.
 - `display_status` adds `overdue` for unpaid invoices past their due date.
 - `balance_due = total - amount_paid - credited_amount`.
+
+## Reports
+`GET /reports` lists the available reports and the parameters each one takes:
+- `period` reports take `date_from` and `date_to` (default: this month; at most three years).
+- `daily-closing` takes `day`.
+- The ageing reports take `as_of`.
+- `stock-valuation` takes an optional `location_id`.
+
+Add `format=pdf`, `xlsx` or `csv` to download. Every report run is written to the audit log.
 
 ## Example: receive stock
 ```bash

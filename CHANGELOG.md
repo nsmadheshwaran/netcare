@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.3.0 (2026-10-02): Phase 3, finance, GST support and documents
+### Added
+- Money accounts (cash, bank, other) with opening balances and defaults. Payments now record which account
+  they used; payments without one go to the default cash or bank account.
+- Expenses and other income by category, with claimable GST recorded separately; transfers between accounts;
+  void with reason.
+- Moving-average costing: products carry `avg_cost`, issued invoice lines store `unit_cost`, and returns and
+  cancellations go back into stock at their original cost.
+- Ten reports (profit and loss, cash flow, daily closing, sales and purchase registers, expenses, receivables
+  and payables ageing, stock valuation, draft GST summary), each as JSON, CSV, Excel or PDF.
+- Printable A4 tax invoice and quotation, 80 mm thermal receipt, and payment receipt/voucher, with amounts in
+  words using lakh and crore.
+- Business logo upload (PNG/JPEG checked by content, 300 KB limit).
+- Versioned GST rate master, enforced by document date once configured; tax-inclusive (MRP) pricing.
+- Business-local dates (IST, configurable offset) for "today", overdue status, the dashboard and reports.
+- Migration `0003`. Test count: 60 backend tests (was 44). pyflakes added to the dev requirements.
+
+### Fixed
+- Dashboard "today" used the UTC date and was wrong between midnight and 05:30 IST.
+- New products started with zero average cost, so stock added without a cost looked free.
+
+
 ## 0.2.0 (2026-10-02): Phase 2, business management
 ### Added
 - Suppliers with payment terms and outstanding balances.

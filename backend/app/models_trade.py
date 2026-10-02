@@ -211,6 +211,7 @@ class Quotation(TimestampMixin, _TotalsMixin, Base):
     status: Mapped[str] = mapped_column(String(20), default="draft")
     # draft | sent | accepted | rejected | converted | expired
     document_discount: Mapped[Decimal] = mapped_column(MONEY, default=Decimal("0"))
+    prices_include_tax: Mapped[bool] = mapped_column(Boolean, default=False)
     notes: Mapped[str | None] = mapped_column(Text)
     terms: Mapped[str | None] = mapped_column(Text)
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
@@ -242,6 +243,7 @@ class SalesInvoice(TimestampMixin, _TotalsMixin, Base):
     status: Mapped[str] = mapped_column(String(20), default="draft")
     # draft | issued | partially_paid | paid | cancelled   ("overdue" is derived from due_date)
     document_discount: Mapped[Decimal] = mapped_column(MONEY, default=Decimal("0"))
+    prices_include_tax: Mapped[bool] = mapped_column(Boolean, default=False)
     amount_paid: Mapped[Decimal] = mapped_column(MONEY, default=Decimal("0"))
     credited_amount: Mapped[Decimal] = mapped_column(MONEY, default=Decimal("0"))
     notes: Mapped[str | None] = mapped_column(Text)
@@ -263,6 +265,8 @@ class SalesInvoiceLine(_LineMixin, Base):
     product_id: Mapped[int | None] = mapped_column(ForeignKey("products.id"))
     line_discount_pct: Mapped[Decimal] = mapped_column(RATE, default=Decimal("0"))
     returned_quantity: Mapped[Decimal] = mapped_column(QTY, default=Decimal("0"))
+    # Moving-average unit cost captured when the invoice was issued (None for services / free text).
+    unit_cost: Mapped[Decimal | None] = mapped_column(MONEY)
 
 
 class CreditNote(Base):
@@ -316,6 +320,7 @@ class Payment(TimestampMixin, Base):
     payment_date: Mapped[date] = mapped_column(Date, index=True)
     amount: Mapped[Decimal] = mapped_column(MONEY)
     method: Mapped[str] = mapped_column(String(20))  # cash | upi | bank_transfer | card | cheque | other
+    account_id: Mapped[int | None] = mapped_column(ForeignKey("money_accounts.id"))
     reference: Mapped[str | None] = mapped_column(String(80))
     notes: Mapped[str | None] = mapped_column(Text)
     idempotency_key: Mapped[str | None] = mapped_column(String(80))
