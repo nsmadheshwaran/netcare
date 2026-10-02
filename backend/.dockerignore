@@ -1,0 +1,6 @@
+__pycache__
+*.db
+.pytest_cache
+tests
+DEV_SEED.md
+.env
