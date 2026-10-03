@@ -592,8 +592,34 @@ def documents_expiring(ctx: OrgContext, as_of: date) -> Report:
         notes=["Negative days means already expired. Only documents you are allowed to see are listed."])
 
 
+def uptime_report(ctx: OrgContext, d0: date, d1: date) -> Report:
+    from ..models_monitoring import MonitorAgent, MonitorCheck
+    from .monitoring import window_stats
+    start, end = _local_range(d0, d1)
+    rows = []
+    for c in ctx.db.scalars(select(MonitorCheck).where(MonitorCheck.organization_id == ctx.org_id)
+                            .order_by(MonitorCheck.name)):
+        s = window_stats(ctx.db, c.id, start, end)
+        agent = ctx.db.get(MonitorAgent, c.agent_id)
+        asset = ctx.db.get(Asset, c.asset_id) if c.asset_id else None
+        cust_id = asset.customer_id if asset else agent.customer_id
+        rows.append({"check": c.name, "site": ctx.db.get(Customer, cust_id).name if cust_id else "",
+                     "target": f"{c.host}:{c.port}" if c.port else c.host, "kind": c.kind.upper(),
+                     "uptime": "" if s["uptime_pct"] is None else f"{s['uptime_pct']:.2f}%",
+                     "samples": s["samples"], "incidents": s["incidents"], "downtime": s["downtime_minutes"],
+                     "avg": s["avg_latency_ms"], "p95": s["p95_latency_ms"]})
+    return Report("Uptime and latency", [
+        Column("check", "Check"), Column("site", "Site"), Column("target", "Target"), Column("kind", "Type"),
+        Column("uptime", "Uptime"), Column("samples", "Results", "int"), Column("incidents", "Outages", "int"),
+        Column("downtime", "Down (min)", "int"), Column("avg", "Avg ms", "int"), Column("p95", "95% ms", "int")],
+        rows, period_label(d0, d1), notes=[
+            "Uptime is the share of results that succeeded. Blank means no results: the agent was not reporting.",
+            "Raw results are kept for 30 days, so older periods show outages only.",
+            "Measured from your monitoring agent's network; it is not a service-level guarantee."])
+
+
 # Reports that need a permission beyond reports.view.
-REPORT_PERMS = {"documents-expiring": "documents.view"}
+REPORT_PERMS = {"documents-expiring": "documents.view", "uptime": "monitoring.view"}
 
 CATALOG = {
     "sales-register": ("Sales register", "period", sales_register),
@@ -612,4 +638,5 @@ CATALOG = {
     "task-completion": ("Task completion", "period", task_completion),
     "attendance": ("Attendance summary", "period", attendance_summary),
     "documents-expiring": ("Documents expiring", "as_of", documents_expiring),
+    "uptime": ("Uptime and latency", "period", uptime_report),
 }

@@ -17,10 +17,12 @@ ALL = {
     "service.view", "service.edit", "service.work", "assets.view", "assets.edit",
     "employees.view", "employees.manage", "attendance.manage", "tasks.view", "tasks.edit",
     "documents.view", "documents.edit", "documents.sensitive", "documents.purge", "analytics.view",
+    "monitoring.view", "monitoring.manage",
 }
 
 # service.edit: create, assign, cancel, close and bill any ticket.
 # service.work: update tickets assigned to *your own* employee record (enforced in the service router).
+# monitoring.manage: agents (tokens) and checks, owner/manager only; technicians and reception can watch.
 # documents.*: a document is also visible only if the caller can view the record it is attached to.
 # documents.sensitive (ID proofs, contracts) and documents.purge (permanent removal) stay with owner/manager.
 EXTRA = {
@@ -29,9 +31,9 @@ EXTRA = {
     "salesperson": {"service.view", "assets.view", "tasks.view", "documents.view", "documents.edit"},
     "inventory_manager": {"service.view", "assets.view", "tasks.view", "documents.view", "documents.edit"},
     "technician": {"service.view", "service.work", "assets.view", "tasks.view", "documents.view",
-                   "documents.edit"},
+                   "documents.edit", "monitoring.view"},
     "receptionist": {"service.view", "service.edit", "assets.view", "assets.edit", "tasks.view",
-                     "documents.view", "documents.edit"},
+                     "documents.view", "documents.edit", "monitoring.view"},
     "viewer": {"service.view", "assets.view", "tasks.view", "documents.view"},
 }
 

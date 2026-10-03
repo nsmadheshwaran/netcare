@@ -141,6 +141,22 @@ customers and service jobs for a period, each compared with the previous period 
 trend chart and your top products, customers, categories and payment methods. Gross profit only counts sales
 whose cost was recorded; the page says how many lines were left out.
 
+## Network monitoring
+Owners and managers set this up; technicians and reception can watch it.
+1. **Add agent** for a site and copy the `agent.json` it shows (the token is shown only once). Install the
+   agent on an always-on PC at that site: see the [agent guide](MONITORING_AGENT.md).
+2. **Add check** for each device: *Ping*, or *TCP port open* for devices that ignore ping (cameras and NVRs
+   usually answer on 554 or 80). Link the check to the equipment so its status shows under IT Assets and CCTV.
+3. **Down** means several results in a row failed (you choose how many). **Unknown** means the agent is not
+   reporting, so NetCare cannot tell. Click a check for uptime, latency and its outages.
+- **New token** if the agent PC was replaced; **Revoke** if it was lost. Either stops the old agent at once.
+- The **Uptime and latency** report lists every check for a period.
+
+## CCTV
+**CCTV Management** shows each DVR/NVR with its storage, how many days it keeps, and the cameras on each
+channel, with warranty and live network status. When adding a camera under IT Assets, choose its recorder
+and channel; a channel can only be used once per recorder.
+
 ## Service jobs
 1. **New ticket.** Pick the customer and the type (repair, installation, maintenance or complaint). Choose
    their registered equipment or describe a walk-in item, note what came with it (charger, bag), and assign a

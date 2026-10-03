@@ -1,6 +1,7 @@
 """Service and repair: tickets, parts used, customer approval, billing, assets, maintenance, technician workspace."""
 import calendar
 import ipaddress
+import re
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from typing import Literal
@@ -553,11 +554,27 @@ class AssetIn(BaseModel):
     sales_invoice_id: int | None = None
     status: Literal["active", "replaced", "retired"] = "active"
     notes: str | None = None
+    mac_address: str | None = Field(default=None, max_length=17)
+    firmware: str | None = Field(default=None, max_length=60)
+    recorder_id: int | None = None
+    channel: int | None = Field(default=None, ge=1, le=256)
+    resolution: str | None = Field(default=None, max_length=20)
+    hdd_capacity_gb: int | None = Field(default=None, ge=0, le=1_000_000)
+    retention_days: int | None = Field(default=None, ge=0, le=3650)
 
     @model_validator(mode="after")
     def _clean(self):
         if self.serial_number == "":
             self.serial_number = None
+        if self.mac_address:
+            mac = re.sub(r"[^0-9A-Fa-f]", "", self.mac_address)
+            if len(mac) != 12:
+                raise ValueError("Invalid MAC address")
+            self.mac_address = ":".join(mac[i:i + 2] for i in range(0, 12, 2)).upper()
+        else:
+            self.mac_address = None
+        if self.channel is not None and self.recorder_id is None:
+            raise ValueError("A channel needs a recorder")
         if self.ip_address:
             try:
                 ipaddress.ip_address(self.ip_address)
@@ -571,6 +588,8 @@ class AssetIn(BaseModel):
 class AssetOut(AssetIn, ORM):
     id: int
     customer_name: str | None = None
+    recorder_name: str | None = None
+    monitor_status: str | None = None  # worst status of its enabled monitoring checks, if any
     warranty_status: str = "unknown"  # in_warranty | expiring | expired | unknown
     open_tickets: int = 0
     installed_by_ticket_id: int | None = None
@@ -585,6 +604,10 @@ def _asset_out(ctx: OrgContext, a: Asset) -> AssetOut:
             "expiring" if a.warranty_until <= t + timedelta(days=30) else "in_warranty"
     o.open_tickets = ctx.db.scalar(select(func.count()).select_from(ServiceTicket).where(
         ServiceTicket.asset_id == a.id, ServiceTicket.status.in_(OPEN)))
+    if a.recorder_id:
+        o.recorder_name = ctx.db.get(Asset, a.recorder_id).name
+    from .monitoring import asset_monitor_status  # local import: monitoring imports this module's models
+    o.monitor_status = asset_monitor_status(ctx, a.id)
     return o
 
 
@@ -596,6 +619,18 @@ def _validate_asset(ctx: OrgContext, body: AssetIn, exclude_id: int | None = Non
         inv = get_owned(ctx, SalesInvoice, body.sales_invoice_id, "Invoice", status_code=422)
         if inv.customer_id != body.customer_id:
             raise HTTPException(422, "Invoice belongs to another customer")
+    if body.recorder_id is not None:
+        rec = get_owned(ctx, Asset, body.recorder_id, "Recorder", status_code=422)
+        if rec.asset_type not in ("dvr", "nvr") or rec.id == exclude_id:
+            raise HTTPException(422, "The recorder must be a DVR or NVR")
+        if rec.customer_id != body.customer_id:
+            raise HTTPException(422, "The recorder is at another customer's site")
+        if body.channel is not None:
+            q = select(Asset.id).where(Asset.recorder_id == rec.id, Asset.channel == body.channel)
+            if exclude_id:
+                q = q.where(Asset.id != exclude_id)
+            if ctx.db.scalar(q):
+                raise HTTPException(409, f"Channel {body.channel} of {rec.name} is already used")
     if body.serial_number:
         q = select(Asset.id).where(Asset.organization_id == ctx.org_id, Asset.serial_number == body.serial_number)
         if exclude_id:

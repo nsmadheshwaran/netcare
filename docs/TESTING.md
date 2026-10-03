@@ -60,6 +60,24 @@ Each form was type-checked, and the same API calls they make were exercised.
   customer, paying another tenant's invoice; inventory managers cannot approve POs; accountants are
   read-only on sales; technicians see no sales or payments.
 
+## Results at Phase 6 (2026-10-03)
+| Suite | Result |
+|---|---|
+| Backend pytest | **91 passed** (11 new monitoring, CCTV and agent tests) |
+| `alembic check`, upgrade/downgrade/upgrade | passed through `0006` |
+| pyflakes (app, tests, agent), `tsc`, vitest, Vite build | clean, clean, 3 passed, built |
+| Live run | Created an agent in the UI (token shown once), added three checks, ran the real agent with `--once`: the API port showed up (2 ms), loopback ping up (1 ms, parsed from Windows `ping`), a closed port down with an open outage. Revoking the agent made the next agent run exit with code 2. CCTV page rendered the dev cameras |
+| Bugs found by the tests | Two copies of one result in the same batch were both stored (fixed: in-batch de-duplication); `192.168.1.1-50` passed as a host name (fixed: the last label must contain a letter). The UI forced choosing a customer for an agent (fixed: the site is optional) |
+
+Phase 6 test coverage: token shown once, hash only, rotation and revocation stop the old token, user tokens
+are not agent tokens; threshold, outage start at the first failure, recovery, slow = degraded; duplicates
+within and across batches; late results; foreign check ids; future and too-old timestamps; batch limit;
+offline agent shows unknown without an outage; target validation (CIDR, ranges, URLs, option injection,
+broadcast, multicast); host from linked equipment; equipment at another site; target change resets state;
+roles and cross-tenant isolation; uptime report; CCTV recorder/channel rules, MAC normalisation, monitor
+status on equipment; agent TCP checks against a real socket, host safety, queue persistence and cap, and an
+end-to-end run (offline queueing, delivery, revoke) through the real API.
+
 ## Results at Phase 5 (2026-10-03)
 | Suite | Result |
 |---|---|

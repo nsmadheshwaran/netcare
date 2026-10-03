@@ -5,9 +5,10 @@ import { useAuth } from "../auth";
 import { PartySelect, useCustomers } from "../components/trade";
 import { Badge, Empty, ErrorBanner, Field, Modal, PageHeader, Pager, Spinner, useAsync } from "../components/ui";
 import { AttachedDocuments } from "./Documents";
+import { MonitorBadge } from "./Monitoring";
 import { StatusBadge, TicketDetail } from "./Service";
 
-type Asset = { id: number; customer_id: number; customer_name: string; asset_type: string; name: string; brand: string | null; model: string | null; serial_number: string | null; site_location: string | null; ip_address: string | null; installed_on: string | null; warranty_until: string | null; warranty_status: string; status: string; open_tickets: number; notes: string | null };
+type Asset = { id: number; customer_id: number; customer_name: string; asset_type: string; name: string; brand: string | null; model: string | null; serial_number: string | null; site_location: string | null; ip_address: string | null; installed_on: string | null; warranty_until: string | null; warranty_status: string; status: string; open_tickets: number; notes: string | null; mac_address: string | null; firmware: string | null; recorder_id: number | null; recorder_name: string | null; channel: number | null; resolution: string | null; hdd_capacity_gb: number | null; retention_days: number | null; monitor_status: string | null };
 const TYPES = ["camera", "dvr", "nvr", "storage", "computer", "laptop", "printer", "router", "switch", "server", "ups", "access_point", "other"];
 const W_TONE: Record<string, "green" | "amber" | "red" | "slate"> = { in_warranty: "green", expiring: "amber", expired: "red", unknown: "slate" };
 
@@ -16,11 +17,17 @@ function AssetForm({ initial, onDone }: { initial: Partial<Asset>; onDone: () =>
   const [f, setF] = useState<any>({ asset_type: "camera", status: "active", ...initial });
   const [error, setError] = useState<string | null>(null);
   const set = (k: string) => (e: React.ChangeEvent<any>) => setF({ ...f, [k]: e.target.value });
+  const recorders = useAsync(() => f.customer_id && f.asset_type === "camera"
+    ? Promise.all(["dvr", "nvr"].map((t) => api<Page<Asset>>(`/assets?customer_id=${f.customer_id}&asset_type=${t}&size=200`))).then(([a, b]) => ({ items: [...a.items, ...b.items] }))
+    : Promise.resolve({ items: [] as Asset[] }), [f.customer_id, f.asset_type]);
   async function submit(e: FormEvent) {
     e.preventDefault();
-    const keys = ["customer_id", "asset_type", "name", "brand", "model", "serial_number", "site_location", "ip_address", "installed_on", "warranty_until", "status", "notes"];
+    const keys = ["customer_id", "asset_type", "name", "brand", "model", "serial_number", "site_location", "ip_address", "installed_on", "warranty_until", "status", "notes",
+      "mac_address", "firmware", "recorder_id", "channel", "resolution", "hdd_capacity_gb", "retention_days"];
     const body: any = Object.fromEntries(keys.map((k) => [k, f[k] === "" || f[k] === undefined ? null : f[k]]));
     body.customer_id = Number(body.customer_id);
+    for (const k of ["recorder_id", "channel", "hdd_capacity_gb", "retention_days"]) if (body[k] !== null) body[k] = Number(body[k]);
+    if (f.asset_type !== "camera") { body.recorder_id = null; body.channel = null; }
     try { await api(f.id ? `/assets/${f.id}` : "/assets", { method: f.id ? "PUT" : "POST", json: body }); onDone(); } catch (err: any) { setError(err.message); }
   }
   const input = (k: string, label: string, props: any = {}) => <Field label={label}><input className="input" value={f[k] ?? ""} onChange={set(k)} {...props} /></Field>;
@@ -35,9 +42,20 @@ function AssetForm({ initial, onDone }: { initial: Partial<Asset>; onDone: () =>
         {input("site_location", "Where at site")}{input("ip_address", "IP address")}
         <Field label="Status"><select className="input" value={f.status} onChange={set("status")}><option value="active">Active</option><option value="retired">Retired</option></select></Field>
         {input("installed_on", "Installed on", { type: "date" })}{input("warranty_until", "Warranty until", { type: "date" })}
+        {input("mac_address", "MAC address", { placeholder: "AA:BB:CC:DD:EE:FF" })}{input("firmware", "Firmware")}
+        {f.asset_type === "camera" && <>
+          <Field label="Recorder (DVR/NVR)"><select className="input" value={f.recorder_id ?? ""} onChange={set("recorder_id")}><option value="">Not connected / standalone</option>
+            {recorders.data?.items.filter((r) => r.id !== f.id).map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}</select></Field>
+          {input("channel", "Channel", { type: "number", min: 1, max: 256, disabled: !f.recorder_id })}
+          {input("resolution", "Resolution", { placeholder: "2MP, 4MP, 4K" })}
+        </>}
+        {["dvr", "nvr", "storage"].includes(f.asset_type) && <>
+          {input("hdd_capacity_gb", "Storage (GB)", { type: "number", min: 0 })}
+          {input("retention_days", "Keeps recordings (days)", { type: "number", min: 0 })}
+        </>}
         <Field label="Notes" className="sm:col-span-3"><textarea className="input" rows={2} value={f.notes ?? ""} onChange={set("notes")} /></Field>
       </div>
-      <p className="text-xs text-slate-500">IP addresses are recorded for reference. Network monitoring of these devices is a planned module.</p>
+      <p className="text-xs text-slate-500">To watch this device, add a check for it under Network monitoring.</p>
       <div className="flex justify-end gap-2"><button type="button" className="btn-ghost" onClick={onDone}>Cancel</button><button className="btn-primary">Save</button></div>
     </form>
   );
@@ -86,11 +104,11 @@ export default function Assets() {
               <thead className="bg-slate-50 dark:bg-slate-800/50"><tr><th className="th">Equipment</th><th className="th">Customer / site</th><th className="th">Serial / IP</th><th className="th">Warranty</th><th className="th">Status</th><th className="th" /></tr></thead>
               <tbody>{data.items.map((a) => (
                 <tr key={a.id} className="border-t border-slate-100 dark:border-slate-800">
-                  <td className="td"><div className="font-medium">{a.name}</div><div className="text-xs text-slate-500">{a.asset_type}{a.brand ? ` · ${a.brand}` : ""}{a.model ? ` ${a.model}` : ""}</div></td>
+                  <td className="td"><div className="font-medium">{a.name}</div><div className="text-xs text-slate-500">{a.asset_type}{a.brand ? ` · ${a.brand}` : ""}{a.model ? ` ${a.model}` : ""}{a.recorder_name ? ` · ${a.recorder_name} ch ${a.channel ?? "?"}` : ""}</div></td>
                   <td className="td">{a.customer_name}<div className="text-xs text-slate-500">{a.site_location}</div></td>
                   <td className="td font-mono text-xs">{a.serial_number}<div>{a.ip_address}</div></td>
                   <td className="td">{a.warranty_until ? <><Badge tone={W_TONE[a.warranty_status]}>{a.warranty_status.replace("_", " ")}</Badge><div className="text-xs text-slate-500">{a.warranty_until}</div></> : <span className="text-xs text-slate-400">unknown</span>}</td>
-                  <td className="td"><Badge tone={a.status === "active" ? "green" : "slate"}>{a.status}</Badge>{a.open_tickets > 0 && <div className="text-xs text-amber-700">{a.open_tickets} open ticket(s)</div>}</td>
+                  <td className="td"><Badge tone={a.status === "active" ? "green" : "slate"}>{a.status}</Badge>{a.open_tickets > 0 && <div className="text-xs text-amber-700">{a.open_tickets} open ticket(s)</div>}{a.monitor_status && <div className="mt-0.5 text-xs">network: <MonitorBadge s={a.monitor_status} /></div>}</td>
                   <td className="td whitespace-nowrap text-right">
                     <button className="rounded p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700" onClick={() => setHistory(a)} title="Service history" aria-label="Service history"><History size={15} /></button>
                     {can("assets.edit") && <button className="btn-ghost !py-1 text-xs" onClick={() => setEditing(a)}>Edit</button>}

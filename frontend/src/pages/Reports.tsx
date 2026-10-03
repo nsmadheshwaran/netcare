@@ -25,6 +25,7 @@ const DESCRIPTIONS: Record<string, string> = {
   "task-completion": "Tasks completed, late and open, per employee",
   "attendance": "Days present, absent and on leave, per employee",
   "documents-expiring": "Contracts, warranty cards and licences expiring within 60 days",
+  "uptime": "Uptime, outages and latency of every monitoring check",
 };
 
 function PackForm({ onDone }: { onDone: () => void }) {

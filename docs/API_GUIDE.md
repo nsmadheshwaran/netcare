@@ -74,6 +74,11 @@ X-Organization-ID: <organization_id from /auth/me>
 | POST /documents/{id}/delete {reason}, POST .../restore, POST .../purge | documents.edit, documents.sensitive, documents.purge |
 | GET /analytics/overview?date_from=&date_to= | analytics.view |
 | GET /reports/pack?date_from=&date_to=&format=xlsx,pdf,csv&keys= | reports.view |
+| GET/POST /monitoring/agents, PUT /monitoring/agents/{id} | monitoring.view, monitoring.manage |
+| POST /monitoring/agents/{id}/rotate-token, POST .../revoke | monitoring.manage (token returned once) |
+| GET/POST /monitoring/checks, GET/PUT/DELETE /monitoring/checks/{id} | monitoring.view, monitoring.manage |
+| GET /monitoring/checks/{id}/stats?range=24h,7d,30d, GET /monitoring/overview, GET /monitoring/assets/{id}/checks | monitoring.view |
+| GET /agent/config, POST /agent/results | agent token (`Authorization: Bearer nca_...`) |
 | GET /dashboard/summary?period=day,week,month,quarter,year&location_id= | dashboard.view |
 | GET /audit-logs | audit.view |
 | GET /health, GET /ready | public |
@@ -130,6 +135,13 @@ Add `format=pdf`, `xlsx` or `csv` to download. Every report run is written to th
 
 `GET /reports/pack` returns a ZIP of every report for one period (or only `keys=a,b`). Period reports cover the
 period; as-of reports use `date_to`; the daily closing is left out.
+
+## Agent API
+`GET /api/v1/agent/config` returns the agent's enabled checks. `POST /api/v1/agent/results` takes up to 1000
+results: `{"results": [{"check_id": 3, "observed_at": "2026-10-03T12:00:00Z", "ok": false, "latency_ms": null,
+"error": "TCP 554: timed out"}]}`. The answer reports `accepted`, `duplicates`, `rejected_check_ids` and
+`too_old` (older than 30 days). Timestamps more than 5 minutes in the future are refused (422): fix the clock.
+Optional headers `X-Agent-Version` and `X-Agent-Hostname` are shown in NetCare.
 
 ## Documents
 ```bash

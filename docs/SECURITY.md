@@ -30,6 +30,13 @@
   `Content-Security-Policy` and `Cache-Control: no-store`. A document is visible only to members who can also
   see the record it is attached to; sensitive documents only to owners and managers. Uploads, downloads,
   edits, deletes, restores and purges are audited. There is **no antivirus scan**: see known limitations.
+- **Monitoring agents:** per-agent tokens (256-bit, `nca_` prefix) are shown once and stored only as SHA-256.
+  Revoking or rotating takes effect on the next request, and the agent stops itself on a 401. Agents can read
+  only their own configuration and report only for their own checks. Targets are single hosts (no ranges,
+  CIDR, wildcards, URLs, broadcast or multicast), validated on the server and again by the agent before it
+  runs `ping` (argument list, no shell, so no option or command injection). The agent opens no ports and talks
+  HTTPS only. Managing agents and checks needs `monitoring.manage` (owners and managers), and every change is
+  audited. See [MONITORING_AGENT](MONITORING_AGENT.md).
 - **PDFs:** user-entered text is XML-escaped before ReportLab renders it, so names like `A & B <Traders>`
   cannot break or inject markup.
 - **Reports:** limited to a three-year span per request to bound load; every report run is audited.
@@ -46,6 +53,8 @@
 - **No malware scanning of uploads.** The allow-list blocks executables and macro documents, but a malicious
   PDF or image could still target a reader's PDF/image software. Add ClamAV (or similar) before accepting
   files from outside the business.
+- **Agent endpoints have no rate limit.** Tokens are unguessable, but a flood of requests with bad tokens
+  still costs a database lookup each. Put rate limiting on `/api/v1/agent/` in your reverse proxy.
 - **Documents are not encrypted at rest** by NetCare. Use disk encryption on the server.
 - **Tokens live in `localStorage`.** That is simple but readable by any XSS. React escapes output and there is
   no raw HTML rendering, but before production consider httpOnly cookies with CSRF protection.

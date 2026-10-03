@@ -86,6 +86,7 @@ class Asset(TimestampMixin, Base):
     warranty tracking and (later) monitoring."""
     __tablename__ = "assets"
     __table_args__ = (UniqueConstraint("organization_id", "serial_number"),
+                      UniqueConstraint("recorder_id", "channel", name="uq_assets_recorder_channel"),
                       Index("ix_assets_org_customer", "organization_id", "customer_id"))
     id: Mapped[int] = mapped_column(primary_key=True)
     organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), index=True)
@@ -107,6 +108,14 @@ class Asset(TimestampMixin, Base):
     replaced_by_id: Mapped[int | None] = mapped_column(ForeignKey("assets.id"))
     status: Mapped[str] = mapped_column(String(15), default="active")  # active | replaced | retired
     notes: Mapped[str | None] = mapped_column(Text)
+    # Phase 6: device and CCTV details
+    mac_address: Mapped[str | None] = mapped_column(String(17))
+    firmware: Mapped[str | None] = mapped_column(String(60))
+    recorder_id: Mapped[int | None] = mapped_column(ForeignKey("assets.id", name="fk_assets_recorder_id"), index=True)  # camera -> DVR/NVR
+    channel: Mapped[int | None] = mapped_column(Integer)  # recorder channel the camera is on
+    resolution: Mapped[str | None] = mapped_column(String(20))  # "2MP", "4K"
+    hdd_capacity_gb: Mapped[int | None] = mapped_column(Integer)  # recorders and storage
+    retention_days: Mapped[int | None] = mapped_column(Integer)  # how many days the recorder keeps
 
 
 # ---------------- service ----------------

@@ -118,6 +118,23 @@ Customer site: (future) Windows agent --outbound HTTPS, per-agent revocable toke
 - **Report pack.** `GET /reports/pack` renders every allowed report into one ZIP. `REPORT_PERMS` adds extra
   permissions to individual reports (the document expiry report needs `documents.view`).
 
+## Monitoring and CCTV (Phase 6)
+- **Pieces.** `agent/netcare_agent.py` (runs at the site) calls `GET /api/v1/agent/config` and
+  `POST /api/v1/agent/results`. `routers/monitoring.py` holds that agent API and the admin API.
+  `services/monitoring.py` holds tokens, target validation, the state machine and the statistics.
+- **Agent auth.** `current_agent` hashes the bearer token and looks it up; revoked tokens get 401. The agent
+  only sees its own enabled checks; results for other check ids are rejected per item (`rejected_check_ids`).
+- **State machine.** Results are applied in `observed_at` order; late results are stored but do not change
+  state. `failure_threshold` failures in a row make a check down and open a `monitor_incidents` row from the
+  first failure (`failing_since`); the next success closes it. A latency above `latency_warn_ms` is degraded.
+  Duplicates (same check and timestamp) are skipped, so agent retries are safe.
+- **Unknown.** `effective_status` is computed at read time: agent silent for 5 minutes, check disabled, or
+  result older than three intervals means unknown. The stored state is kept, and no incident is invented.
+- **Retention.** Raw results are pruned after 30 days on ingest; incidents are kept. Uptime is the share of
+  successful results in the window (None when there are none), downtime comes from incidents.
+- **CCTV.** Cameras link to a DVR/NVR (`assets.recorder_id`, `channel`, unique per recorder) at the same
+  customer. Equipment shows the worst effective status of its enabled checks (`monitor_status`).
+
 ## Frontend layout (`frontend/src`)
 - `api.ts`: fetch wrapper and error formatting
 - `auth.tsx`: session and permissions context

@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.6.0 (2026-10-03): Phase 6, monitoring and CCTV
+### Added
+- Monitoring agent (`agent/netcare_agent.py`, Python standard library only): fetches its checks, runs ping and
+  TCP-port checks, queues results on disk while offline, retries with backoff, stops when its token is revoked.
+  Install and uninstall steps in `docs/MONITORING_AGENT.md`.
+- Agents with per-agent tokens (shown once, stored hashed, rotate and revoke); checks with interval, timeout,
+  failure threshold and latency warning; single-host targets only.
+- Up/slow/down/unknown status, outages (from the first failure to recovery), uptime and latency statistics for
+  24 hours, 7 and 30 days, latency chart, overview tiles; "Uptime and latency" report.
+- CCTV page: recorders with storage and retention, cameras by channel. Equipment gains MAC address, firmware,
+  recorder and channel, resolution, storage and retention, and shows its live network status.
+- Migration `0006`. Test count: 91 backend tests (was 80).
+
 ## 0.5.0 (2026-10-03): Phase 5, documents and analytics
 ### Added
 - Document library: upload PDF, images, Word/Excel (no macros), text and CSV up to 15 MB; attach to customers,

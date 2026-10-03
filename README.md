@@ -7,8 +7,8 @@ IT service providers, electronics retailers, schools and SMBs.
 
 > **Status: Phase 5 (documents and analytics) complete.** Business management, finance and reports, service
 > and repair tickets, technicians, customer equipment, maintenance schedules, employees, attendance, leave,
-> tasks, a secure document library and analytics work end to end. Network/CCTV monitoring, endpoint security,
-> the data organizer and notifications are **not built yet**. They show as "Planned" in
+> tasks, a secure document library, analytics, network monitoring and CCTV records work end to end. Endpoint
+> security, the data organizer and notifications are **not built yet**. They show as "Planned" in
 > the UI and appear on the dashboard as "Not yet available", with no placeholder numbers.
 
 ## What works today
@@ -38,6 +38,8 @@ IT service providers, electronics retailers, schools and SMBs.
 | People | Employees (optionally linked to a login), daily attendance, leave requests and approval (approved leave fills attendance), tasks with owners and due dates. No payroll |
 | Documents | Upload PDF, images, Word/Excel (no macros), text and CSV (type checked from the bytes, 15 MB, per-business quota); attach to customers, suppliers, products, invoices, bills, orders, expenses, service jobs, equipment or employees; expiry dates and an expiry report; sensitive documents for owners/managers; soft delete, restore, owner-only purge; every download audited |
 | Analytics | Sales, gross profit, collections, expenses, invoices, new customers and service jobs against the previous period; trend charts; top products, customers, categories and payment methods |
+| Monitoring | Agents at customer sites (outbound HTTPS only, revocable per-agent tokens) run ping and TCP-port checks you configure; up/slow/down/unknown status, outages, uptime and latency charts, uptime report. No scanning or discovery |
+| CCTV | DVR/NVR with storage and retention, cameras by channel, MAC/firmware, warranty and live network status |
 | Report pack | Every report for a period in one ZIP (Excel, PDF or CSV) for the accountant |
 | Numbering | Gap-free, per organization and financial year (e.g. `INV/2026-27/00001`), configurable prefixes, row-locked |
 | Dashboard | Period (day/week/month/quarter/FY) and location filters; invoiced, received, receivables (and overdue), payables, sales vs purchases chart; customer counts, stock valuation at cost, low/out-of-stock, activity chart, recent activity, all from the database |
@@ -86,7 +88,8 @@ Local dev uses SQLite by default (`netcare_dev.db`). For PostgreSQL, set
 - [ ] Phase 3 follow-ups: emailing invoices (needs an email provider), bank statement reconciliation, credit note PDF, GSTR-format exports (only after accountant validation)
 - [x] **Phase 5, documents and analytics:** secure document library attached to records, expiry tracking, analytics with period comparison, all-reports ZIP export
 - [ ] Phase 5 follow-ups: antivirus scanning of uploads, image thumbnails, document versioning, scheduled emailing of report packs (needs an email provider)
-- [ ] **Phase 6:** device inventory, monitoring agent, uptime/latency, CCTV assets
+- [x] **Phase 6, monitoring and CCTV:** monitoring agent (outbound HTTPS, revocable tokens, ping and TCP checks only), outages, uptime and latency, CCTV recorders and channels, device details
+- [ ] Phase 6 follow-ups: signed Windows installer/service for the agent, SNMP read-only metrics, alerts on outages (Phase 9), recorder disk-health checks
 - [ ] **Phase 7:** endpoint security visibility (Defender status/events)
 - [ ] **Phase 8:** local data organizer (dry run, approval, rollback)
 - [ ] **Phase 9:** notifications (in-app, email, optional SMS/WhatsApp)

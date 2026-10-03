@@ -69,6 +69,15 @@ document never changes if a product price or tax rate changes later.
 |---|---|
 | stored_documents | Metadata of an uploaded file: attached record (`entity_type`, `entity_id`, checked against the business in code, not by FK), title, category, tags, expiry, sensitive flag, detected type, size, SHA-256, random `storage_key`; soft delete (`deleted_*`) and `purged_at` tombstone |
 
+### Migration `0006` (Phase 6)
+| Table / column | Purpose |
+|---|---|
+| monitor_agents | Agent per site: SHA-256 of its token (unique), display prefix, active/revoked, last seen/IP/version/host |
+| monitor_checks | One target per check (ICMP host or TCP host+port), interval, timeout, failure threshold, latency warning, current state (`status`, `consecutive_failures`, `failing_since`, `status_since`, last result) |
+| check_results | Raw results, unique per (check, observed_at); pruned after 30 days |
+| monitor_incidents | Outages: started at the first failure, ended at the next success |
+| assets.mac_address, firmware, recorder_id, channel, resolution, hdd_capacity_gb, retention_days | Device and CCTV details; `(recorder_id, channel)` unique |
+
 The file bytes are not in the database; they are in `NETCARE_STORAGE_DIR`. Back up both.
 
 Every business table has an `organization_id` column with `ON DELETE CASCADE` to its organization.
