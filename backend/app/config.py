@@ -20,6 +20,15 @@ class Settings(BaseSettings):
     storage_dir: str = "./storage"
     max_upload_mb: int = 15
     org_storage_quota_mb: int = 2048
+    # Notifications. Email is sent only when smtp_host and smtp_from are set.
+    notifications_worker: bool = True  # background thread: daily digests and email delivery, every minute
+    app_url: str = ""  # public URL used in email links, e.g. https://netcare.example.com
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = ""
+    smtp_starttls: bool = True
 
     @property
     def cors_origin_list(self) -> list[str]:

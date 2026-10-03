@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.9.0 (2026-10-03): Phase 9, notifications
+### Added
+- In-app notifications: header bell with unread count, Alerts page (unread/all, mark read, open the related
+  page), per-user preferences for each kind, in the app and by email.
+- Events: device down and back up, PC security critical, service job and task assigned to you, leave request
+  and decision. Daily digests: overdue invoices, low stock, maintenance due, agents not reporting, documents
+  expiring (counted per person's visibility). Never about your own action; never repeated (dedupe keys).
+- Email through your SMTP server (`NETCARE_SMTP_*`), queued in an outbox and retried with back-off; test email;
+  delivery log for owners. Background worker thread once a minute (`NETCARE_NOTIFICATIONS_WORKER`).
+- Migration `0008`. Test count: 120 backend tests (was 112).
+
 ## 0.8.0 (2026-10-03): Phase 8, data organizer
 ### Added
 - `organizer/netcare_organizer.py`: local command-line tool (standard library only, no network code).

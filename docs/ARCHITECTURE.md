@@ -144,6 +144,14 @@ Customer site: (future) Windows agent --outbound HTTPS, per-agent revocable toke
 - An acknowledgement records that someone reviewed a resolved detection. Active detections cannot be
   acknowledged (409), and an acknowledgement is cleared if the detection becomes active again.
 
+## Notifications (Phase 9)
+- `services/notify.py`: `KINDS` (label, recipient permission, email default), `notify()` (recipients,
+  preferences, dedupe, outbox), `notify_employee()`, `run_digests()`, `deliver_emails()`, `sweep()`.
+- Hooks: `services/monitoring.apply_result` (outage opened/closed), `services/endpoint_security.ingest_report`
+  (rating became critical), `routers/service` (ticket assigned), `routers/employees` (task assigned, leave
+  requested/decided).
+- `main.lifespan` starts a daemon thread that calls `sweep()` every 60 seconds (off in tests).
+
 ## Frontend layout (`frontend/src`)
 - `api.ts`: fetch wrapper and error formatting
 - `auth.tsx`: session and permissions context

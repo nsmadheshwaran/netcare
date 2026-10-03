@@ -269,6 +269,12 @@ def request_leave(body: LeaveIn, ctx: OrgContext = Depends(require("tasks.view")
                       **body.model_dump(exclude={"employee_id"}))
     ctx.db.add(lr)
     ctx.db.flush()
+    from ..services.notify import KINDS, members_with, notify
+    approvers = [u.id for _m, u in members_with(ctx.db, ctx.org_id, KINDS["leave_request"][1])
+                 if u.id != ctx.user.id and u.id != emp.user_id]
+    notify(ctx.db, ctx.org_id, "leave_request", f"Leave request: {emp.name}",
+           f"{lr.leave_type.title()} leave {lr.start_date:%d %b} to {lr.end_date:%d %b %Y}.", "/employees",
+           users=approvers)
     ctx.audit("request", "leave", lr.id, {"employee": emp.id, "from": str(lr.start_date), "to": str(lr.end_date)})
     ctx.db.commit()
     return _leave_out(ctx, lr)
@@ -298,6 +304,10 @@ def decide_leave(lr_id: int, body: LeaveDecisionIn, ctx: OrgContext = Depends(re
                 ctx.db.add(Attendance(organization_id=ctx.org_id, employee_id=lr.employee_id, work_date=d,
                                       status="leave", note=f"{lr.leave_type} leave", recorded_by=ctx.user.id))
             d += timedelta(days=1)
+    from ..services.notify import notify_employee
+    notify_employee(ctx.db, ctx.org_id, lr.employee_id, "leave_decided", f"Leave {body.decision}",
+                    f"{lr.start_date:%d %b} to {lr.end_date:%d %b %Y}" + (f": {body.note}" if body.note else ""),
+                    "/my-work", ctx.user.id)
     ctx.audit(body.decision, "leave", lr.id, {"note": body.note})
     ctx.db.commit()
     return _leave_out(ctx, lr)
@@ -318,6 +328,13 @@ def cancel_leave(lr_id: int, ctx: OrgContext = Depends(require("tasks.view"))):
 
 
 # ---------------- tasks ----------------
+def _notify_task(ctx: OrgContext, t: Task) -> None:
+    from ..services.notify import notify_employee
+    due = f" Due {t.due_date:%d %b %Y}." if t.due_date else ""
+    notify_employee(ctx.db, ctx.org_id, t.assigned_to, "task_assigned", f"Task for you: {t.title}",
+                    f"{(t.description or '')[:200]}{due}".strip() or None, "/my-work", ctx.user.id)
+
+
 PRIORITY = Literal["low", "normal", "high", "urgent"]
 
 
@@ -386,6 +403,7 @@ def create_task(body: TaskIn, ctx: OrgContext = Depends(require("tasks.edit"))):
     t = Task(organization_id=ctx.org_id, created_by=ctx.user.id, **body.model_dump())
     ctx.db.add(t)
     ctx.db.flush()
+    _notify_task(ctx, t)
     ctx.audit("create", "task", t.id, {"title": t.title, "assigned_to": t.assigned_to})
     ctx.db.commit()
     return _task_out(ctx, t)
@@ -395,8 +413,11 @@ def create_task(body: TaskIn, ctx: OrgContext = Depends(require("tasks.edit"))):
 def update_task(task_id: int, body: TaskIn, ctx: OrgContext = Depends(require("tasks.edit"))):
     t = get_owned(ctx, Task, task_id, "Task")
     _check_task_refs(ctx, body)
+    reassigned = body.assigned_to != t.assigned_to
     for k, v in body.model_dump().items():
         setattr(t, k, v)
+    if reassigned:
+        _notify_task(ctx, t)
     ctx.audit("update", "task", t.id)
     ctx.db.commit()
     return _task_out(ctx, t)

@@ -85,6 +85,13 @@ document never changes if a product price or tax rate changes later.
 | endpoints | One PC per (agent, hostname): OS, last report, Defender switches, mode, versions, definition and scan times, optional link to a computer asset |
 | endpoint_threats | Defender detections, unique per (endpoint, DetectionID): name, severity, category, status, file paths, review (acknowledged by/at/note) |
 
+### Migration `0008` (Phase 9)
+| Table | Purpose |
+|---|---|
+| notifications | Per user and business: kind, severity, title, body, app link, read time; unique `dedupe_key` per user and business |
+| notification_prefs | Per user, business and kind: in app on/off, email on/off |
+| email_outbox | Queued emails: status pending/sent/failed, attempts, next attempt, last error |
+
 The file bytes are not in the database; they are in `NETCARE_STORAGE_DIR`. Back up both.
 
 Every business table has an `organization_id` column with `ON DELETE CASCADE` to its organization.

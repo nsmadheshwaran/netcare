@@ -60,6 +60,21 @@ Each form was type-checked, and the same API calls they make were exercised.
   customer, paying another tenant's invoice; inventory managers cannot approve POs; accountants are
   read-only on sales; technicians see no sales or payments.
 
+## Results at Phase 9 (2026-10-03)
+| Suite | Result |
+|---|---|
+| Backend pytest | **120 passed** (8 new notification tests) |
+| `alembic check`, upgrade/downgrade/upgrade | passed through `0008` |
+| pyflakes, `tsc`, vitest, Vite build | clean |
+| Live run | Built today's digests on the dev data (2 overdue invoices, 2 products below minimum, 1 expiring document); the bell showed 3; clicking the stock alert opened Products and the bell dropped to 2 |
+
+Phase 9 test coverage: outage opened and closed notifications (not for a single failure); recipients by
+permission; own-only read and isolation across users and businesses; job, task and leave notifications (not to
+yourself, no repeat when reassigning to the same person); endpoint critical once; digests (overdue, low stock,
+documents counted per person's visibility), no repeat on the same day, owner-only manual run; preferences
+(only receivable kinds listed, unknown kind refused, mute works); email outbox content and links, delivery,
+retries with back-off, giving up after 5 attempts; test email refused without SMTP.
+
 ## Results at Phase 8 (2026-10-03)
 | Suite | Result |
 |---|---|

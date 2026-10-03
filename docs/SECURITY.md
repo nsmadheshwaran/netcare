@@ -43,6 +43,9 @@
   user names, so the pages need `security.view` (owner, manager, technician).
 - **Data organizer:** a local tool with no network code; it never deletes, refuses system folders and whole
   drives, does not follow links, journals every move before and after, and never overwrites a file.
+- **Notifications:** users only ever read and mark their own notifications (other ids are 404). Recipients are
+  chosen by permission, so nobody is told about records they could not open. SMTP credentials live only in the
+  server's environment; the outbox stores message text, not credentials.
 - **PDFs:** user-entered text is XML-escaped before ReportLab renders it, so names like `A & B <Traders>`
   cannot break or inject markup.
 - **Reports:** limited to a three-year span per request to bound load; every report run is audited.

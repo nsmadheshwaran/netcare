@@ -71,6 +71,7 @@ def ingest_report(db, agent, report: dict) -> Endpoint:
     """Upsert the endpoint for (agent, hostname) and its detections."""
     now = utcnow()
     e = db.scalar(select(Endpoint).where(Endpoint.agent_id == agent.id, Endpoint.hostname == report["hostname"]))
+    before = evaluate(e, _recent(db, e.id), now)[0] if e is not None else "unknown"
     if e is None:
         e = Endpoint(organization_id=agent.organization_id, agent_id=agent.id, hostname=report["hostname"])
         db.add(e)
@@ -98,4 +99,16 @@ def ingest_report(db, agent, report: dict) -> Endpoint:
             row.acknowledged_at = row.acknowledged_by = row.acknowledge_note = None  # got worse: review again
         row.status, row.action_success = status, t.get("action_success")
         row.times_reported += 1
+    db.flush()
+    after, reasons = evaluate(e, _recent(db, e.id), now)
+    if after == "critical" and before != "critical":
+        from .notify import notify
+        from .timeutil import today
+        notify(db, e.organization_id, "endpoint_critical", f"Security critical: {e.hostname}",
+               "; ".join(reasons[:3]), "/security", "critical", dedupe=f"endpoint:{e.id}:{today()}")
     return e
+
+
+def _recent(db, endpoint_id: int) -> list[EndpointThreat]:
+    return db.scalars(select(EndpointThreat).where(EndpointThreat.endpoint_id == endpoint_id,
+                                                   EndpointThreat.detected_at >= utcnow() - timedelta(days=30))).all()

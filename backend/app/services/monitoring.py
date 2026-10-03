@@ -19,6 +19,7 @@ from sqlalchemy import delete, select
 
 from ..models import utcnow
 from ..models_monitoring import CheckResult, MonitorAgent, MonitorCheck, MonitorIncident
+from .timeutil import BUSINESS_TZ
 
 TOKEN_PREFIX = "nca_"
 RESULT_RETENTION_DAYS = 30
@@ -73,6 +74,15 @@ def effective_status(check: MonitorCheck, agent: MonitorAgent, now: datetime | N
     return check.status
 
 
+def _target(c: MonitorCheck) -> str:
+    return f"{c.host}:{c.port}" if c.port else c.host
+
+
+def _notify(db, c: MonitorCheck, severity: str, title: str, body: str, key: str) -> None:
+    from .notify import notify  # local import: notify imports models that import this module's peers
+    notify(db, c.organization_id, "monitor_down", title, body, "/monitoring", severity, dedupe=key)
+
+
 def _set_status(c: MonitorCheck, status: str, at: datetime) -> None:
     if c.status != status:
         c.status, c.status_since = status, at
@@ -87,6 +97,9 @@ def apply_result(db, c: MonitorCheck, at: datetime, ok: bool, latency_ms: int | 
         c.consecutive_failures, c.failing_since, c.last_error = 0, None, None
         if open_inc:
             open_inc.ended_at = at
+            mins = round((at - open_inc.started_at).total_seconds() / 60)
+            _notify(db, c, "success", f"Back up: {c.name}", f"{_target(c)} is reachable again after {mins} min.",
+                    f"up:{open_inc.id}")
         slow = c.latency_warn_ms is not None and latency_ms is not None and latency_ms > c.latency_warn_ms
         _set_status(c, "degraded" if slow else "up", at)
         return
@@ -96,8 +109,14 @@ def apply_result(db, c: MonitorCheck, at: datetime, ok: bool, latency_ms: int | 
         c.failing_since = at
     if c.consecutive_failures >= c.failure_threshold:
         if open_inc is None:
-            db.add(MonitorIncident(organization_id=c.organization_id, check_id=c.id, started_at=c.failing_since,
-                                   reason=error))
+            inc = MonitorIncident(organization_id=c.organization_id, check_id=c.id, started_at=c.failing_since,
+                                  reason=error)
+            db.add(inc)
+            db.flush()
+            _notify(db, c, "critical", f"Down: {c.name}",
+                    f"{_target(c)} has failed {c.consecutive_failures} checks in a row since "
+                    f"{c.failing_since.astimezone(BUSINESS_TZ):%d %b %H:%M}. Last error: {error or 'none'}.",
+                    f"down:{inc.id}")
         _set_status(c, "down", c.failing_since if c.status != "down" else at)
 
 

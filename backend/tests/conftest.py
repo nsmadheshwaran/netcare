@@ -1,7 +1,10 @@
 import itertools
+import os
 import shutil
 
-import pytest
+os.environ["NETCARE_NOTIFICATIONS_WORKER"] = "false"  # tests run sweeps explicitly, never in the background
+
+import pytest  # noqa: E402
 from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient

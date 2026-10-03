@@ -56,6 +56,14 @@ def _event(ctx: OrgContext, t: ServiceTicket, kind: str, message: str):
     t.events.append(TicketEvent(kind=kind, message=message, user_id=ctx.user.id))
 
 
+def _notify_assigned(ctx: OrgContext, t: ServiceTicket) -> None:
+    from ..services.notify import notify_employee
+    cust = ctx.db.get(Customer, t.customer_id)
+    visit = f" Visit: {t.scheduled_visit.astimezone(BUSINESS_TZ):%d %b %H:%M}." if t.scheduled_visit else ""
+    notify_employee(ctx.db, ctx.org_id, t.assigned_to, "ticket_assigned", f"Job {t.number} assigned to you",
+                    f"{cust.name}: {t.reported_problem[:200]}.{visit}", "/my-work", ctx.user.id)
+
+
 def _can_work(ctx: OrgContext, t: ServiceTicket) -> None:
     """service.edit may touch any ticket; service.work only tickets assigned to the caller."""
     role = ctx.membership.role
@@ -282,6 +290,7 @@ def create_ticket(body: TicketIn, ctx: OrgContext = Depends(require("service.edi
     _event(ctx, t, "created", f"{body.ticket_type.title()} ticket opened: {body.reported_problem[:200]}")
     if emp:
         _event(ctx, t, "assigned", f"Assigned to {emp.name}")
+        _notify_assigned(ctx, t)
     ctx.audit("create", "service_ticket", t.id, {"number": t.number})
     ctx.db.commit()
     return _ticket_out(ctx, t, detail=True)
@@ -328,12 +337,15 @@ def assign_ticket(tid: int, body: AssignIn, ctx: OrgContext = Depends(require("s
     if t.status not in OPEN:
         raise HTTPException(409, f"Ticket is {t.status}")
     emp = _check_assignee(ctx, body.employee_id)
+    changed = t.assigned_to != (emp.id if emp else None)
     t.assigned_to = emp.id if emp else None
     if body.scheduled_visit:
         t.scheduled_visit = body.scheduled_visit
     if emp and t.status == "new":
         t.status = "assigned"
     _event(ctx, t, "assigned", f"Assigned to {emp.name}" if emp else "Unassigned")
+    if emp and changed:
+        _notify_assigned(ctx, t)
     ctx.audit("assign", "service_ticket", t.id, {"employee": body.employee_id})
     ctx.db.commit()
     return _ticket_out(ctx, t, detail=True)

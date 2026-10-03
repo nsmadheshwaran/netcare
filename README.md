@@ -8,7 +8,7 @@ IT service providers, electronics retailers, schools and SMBs.
 > **Status: Phase 5 (documents and analytics) complete.** Business management, finance and reports, service
 > and repair tickets, technicians, customer equipment, maintenance schedules, employees, attendance, leave,
 > tasks, a secure document library, analytics, network monitoring, CCTV records and endpoint security visibility
-> work end to end, plus a local data organizer. Notifications are **not built yet**. They show as "Planned" in
+> work end to end, plus a local data organizer and notifications (in app and email). They show as "Planned" in
 > the UI and appear on the dashboard as "Not yet available", with no placeholder numbers.
 
 ## What works today
@@ -42,6 +42,7 @@ IT service providers, electronics retailers, schools and SMBs.
 | CCTV | DVR/NVR with storage and retention, cameras by channel, MAC/firmware, warranty and live network status |
 | Endpoint security | Microsoft Defender status of PCs running the agent (opt-in, read-only): protection switches, definition age, scans, 30-day detections; critical / needs attention / protected / not reporting with reasons and next steps; review notes |
 | Data organizer | Local tool (no network): duplicates by SHA-256, optional sorting by type and month, HTML preview, dry run, approval by number, journal and rollback, never deletes; backup verification by hash |
+| Alerts | Bell with unread count; device down/up, PC security critical, job/task assigned, leave requests and decisions; daily overdue invoices, low stock, maintenance due, agents offline, expiring documents; per-user in-app/email choices; email via your SMTP server with retries. SMS/WhatsApp not included |
 | Report pack | Every report for a period in one ZIP (Excel, PDF or CSV) for the accountant |
 | Numbering | Gap-free, per organization and financial year (e.g. `INV/2026-27/00001`), configurable prefixes, row-locked |
 | Dashboard | Period (day/week/month/quarter/FY) and location filters; invoiced, received, receivables (and overdue), payables, sales vs purchases chart; customer counts, stock valuation at cost, low/out-of-stock, activity chart, recent activity, all from the database |
@@ -94,7 +95,8 @@ Local dev uses SQLite by default (`netcare_dev.db`). For PostgreSQL, set
 - [ ] Phase 6 follow-ups: signed Windows installer/service for the agent, SNMP read-only metrics, alerts on outages (Phase 9), recorder disk-health checks
 - [x] **Phase 7, endpoint security:** read-only Microsoft Defender status and detections from opt-in agents, plain-language ratings and next steps, review notes, report
 - [x] **Phase 8, data organizer:** local duplicate finder and folder tidier with plan, preview, dry run, approval, journal, rollback, and backup verification
-- [ ] **Phase 9:** notifications (in-app, email, optional SMS/WhatsApp)
+- [x] **Phase 9, notifications:** in-app bell and Alerts page, per-user preferences, email via SMTP with a retrying outbox, event alerts and daily digests
+- [ ] Phase 9 follow-ups: SMS/WhatsApp (needs a provider account and approved templates), web push
 - [ ] **Phase 10:** module toggles UI, onboarding, security review, E2E tests, pilot release
 
 ## Important limitations

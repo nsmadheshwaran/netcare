@@ -6,6 +6,7 @@ import {
   Wallet, Wrench, Briefcase, TrendingUp, UserCheck, CreditCard, FileSignature, type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "../auth";
+import { NotificationBell } from "../pages/Notifications";
 
 type Item = { label: string; to?: string; icon: LucideIcon; perm?: string };
 
@@ -32,7 +33,7 @@ const NAV: Item[] = [
   { label: "CCTV Management", to: "/cctv", icon: Camera, perm: "assets.view" },
   { label: "Endpoint Security", to: "/security", icon: ShieldCheck, perm: "security.view" },
   { label: "Data Organizer", to: "/organizer", icon: FolderSearch },
-  { label: "Alerts", icon: Bell },
+  { label: "Alerts", to: "/notifications", icon: Bell },
   { label: "Analytics", to: "/analytics", icon: TrendingUp, perm: "analytics.view" },
   { label: "Reports", to: "/reports", icon: BarChart3, perm: "reports.view" },
   { label: "Users and Roles", to: "/users", icon: UserCog, perm: "users.manage" },
@@ -99,6 +100,7 @@ export default function Layout() {
           )}
           <span className="hidden text-xs capitalize text-slate-500 sm:inline">{current?.role.replace("_", " ")}</span>
           <div className="ml-auto flex items-center gap-2">
+            <NotificationBell />
             <button className="btn-ghost !px-2" onClick={() => setDark(!dark)} aria-label="Toggle theme">{dark ? <Sun size={16} /> : <Moon size={16} />}</button>
             <span className="hidden text-sm text-slate-600 dark:text-slate-300 md:inline">{me?.user.full_name}</span>
             <button className="btn-ghost !px-2" onClick={logout} aria-label="Sign out" title="Sign out"><LogOut size={16} /></button>
