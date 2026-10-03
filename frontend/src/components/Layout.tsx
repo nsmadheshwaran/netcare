@@ -3,7 +3,7 @@ import { NavLink, Outlet } from "react-router-dom";
 import {
   Activity, BarChart3, Bell, Boxes, Building2, Camera, ClipboardList, Cpu, FileText, FolderSearch, LayoutDashboard,
   LogOut, Menu, Moon, Package, Receipt, ScrollText, Settings, ShieldCheck, ShoppingCart, Sun, Truck, UserCog, Users,
-  Wallet, Wrench, Briefcase, CreditCard, FileSignature, type LucideIcon,
+  Wallet, Wrench, Briefcase, UserCheck, CreditCard, FileSignature, type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "../auth";
 
@@ -12,6 +12,7 @@ type Item = { label: string; to?: string; icon: LucideIcon; perm?: string };
 // Items without `to` are not built yet and are shown disabled, never as fake pages.
 const NAV: Item[] = [
   { label: "Overview", to: "/", icon: LayoutDashboard, perm: "dashboard.view" },
+  { label: "My work", to: "/my-work", icon: UserCheck, perm: "tasks.view" },
   { label: "Customers", to: "/customers", icon: Users, perm: "customers.view" },
   { label: "Suppliers", to: "/suppliers", icon: Truck, perm: "suppliers.view" },
   { label: "Products", to: "/products", icon: Package, perm: "products.view" },
@@ -22,11 +23,11 @@ const NAV: Item[] = [
   { label: "Payments", to: "/payments", icon: CreditCard, perm: "payments.view" },
   { label: "Expenses", to: "/expenses", icon: Wallet, perm: "expenses.view" },
   { label: "Finance", to: "/finance", icon: BarChart3, perm: "finance.view" },
-  { label: "Employees", icon: Briefcase },
-  { label: "Tasks", icon: ClipboardList },
-  { label: "Service Management", icon: Wrench },
+  { label: "Employees", to: "/employees", icon: Briefcase, perm: "tasks.view" },
+  { label: "Tasks", to: "/tasks", icon: ClipboardList, perm: "tasks.view" },
+  { label: "Service Management", to: "/service", icon: Wrench, perm: "service.view" },
   { label: "Documents", icon: FileText },
-  { label: "IT Assets", icon: Cpu },
+  { label: "IT Assets", to: "/assets", icon: Cpu, perm: "assets.view" },
   { label: "Network Monitoring", icon: Activity },
   { label: "CCTV Management", icon: Camera },
   { label: "Endpoint Security", icon: ShieldCheck },

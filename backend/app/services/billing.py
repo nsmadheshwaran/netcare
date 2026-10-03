@@ -137,7 +137,7 @@ def fiscal_year(d: date) -> str:
 DEFAULT_PREFIX = {"sales_invoice": "INV", "quotation": "QT", "purchase_order": "PO", "goods_receipt": "GRN",
                   "purchase_invoice": "PB", "credit_note": "CN", "purchase_return": "PR",
                   "receipt": "RCPT", "supplier_payment": "PAY", "expense": "EXP", "income": "INC",
-                  "transfer": "TRF"}
+                  "transfer": "TRF", "service_ticket": "SRV"}
 
 
 def next_number(db: Session, org_id: int, doc_type: str, on: date) -> str:

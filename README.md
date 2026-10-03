@@ -5,9 +5,10 @@
 A multi-tenant business management platform for Indian small businesses: computer shops, CCTV installers,
 IT service providers, electronics retailers, schools and SMBs.
 
-> **Status: Phase 3 (finance, GST support, documents) complete.** Foundation, trade workflows, expenses,
-> accounts, reports with PDF/Excel/CSV export, and printable invoices work end to end. Service, employees,
-> document storage, IT monitoring, endpoint security and the data organizer are **not built yet**. They show as "Planned" in
+> **Status: Phase 4 (service and employees) complete.** Business management, finance and reports, plus service
+> and repair tickets, technicians, customer equipment, maintenance schedules, employees, attendance, leave and
+> tasks work end to end. Document storage, network/CCTV monitoring, endpoint security and the data organizer
+> are **not built yet**. They show as "Planned" in
 > the UI and appear on the dashboard as "Not yet available", with no placeholder numbers.
 
 ## What works today
@@ -30,6 +31,11 @@ IT service providers, electronics retailers, schools and SMBs.
 | Reports | Profit and loss summary, cash flow by account, daily closing, sales/purchase registers, expenses, receivables and payables ageing, stock valuation, draft GST summary; each as screen, PDF, Excel or CSV |
 | Documents | A4 GST invoice and quotation (logo, HSN, CGST/SGST or IGST, amount in words, payment instructions), 80 mm thermal receipt, payment receipt/voucher |
 | Tax | Versioned GST rate master (retire and add, never edit) enforced on document dates once configured; tax-inclusive (MRP) pricing per invoice |
+| Service | Repair, installation, maintenance and complaint tickets with an enforced status workflow; estimates need recorded customer approval before work starts; parts are taken from stock when used and returned if unused; one-click draft invoice for parts and labour (no double stock deduction); timeline of notes, calls and changes; job sheet and completion report PDFs |
+| Technicians | "My work" page with assigned jobs, today's visits and tasks; technicians can update only their own tickets (enforced by the API) |
+| Customer equipment | Cameras, DVR/NVRs, computers, network gear per customer site with serial, IP, location, warranty status, service history and replacement records; installations register equipment in one step |
+| Maintenance | Recurring schedules (AMC visits) that create visit tickets and roll forward when the job is completed |
+| People | Employees (optionally linked to a login), daily attendance, leave requests and approval (approved leave fills attendance), tasks with owners and due dates. No payroll |
 | Numbering | Gap-free, per organization and financial year (e.g. `INV/2026-27/00001`), configurable prefixes, row-locked |
 | Dashboard | Period (day/week/month/quarter/FY) and location filters; invoiced, received, receivables (and overdue), payables, sales vs purchases chart; customer counts, stock valuation at cost, low/out-of-stock, activity chart, recent activity, all from the database |
 | Audit | Every create/update/archive/stock change/import/export is logged with the user and IP address |
@@ -72,8 +78,9 @@ Local dev uses SQLite by default (`netcare_dev.db`). For PostgreSQL, set
 - [x] **Phase 2, business:** suppliers, purchase orders → goods receipt → supplier bill, quotations → invoices, payments with allocation, credit notes, purchase returns, FY numbering
 - [ ] Phase 2 follow-ups: sales orders (deliberately skipped; quotation → invoice covers current needs), serial-number capture at sale, tax-inclusive pricing, per-location user restrictions
 - [x] **Phase 3, finance and GST:** expenses, accounts, P&L and cash flow, versioned tax rates, tax-inclusive prices, PDF invoices and receipts, Excel/CSV/PDF exports, draft GST summary
+- [x] **Phase 4, service and employees:** tickets, technicians, approvals, parts, ticket billing, assets and warranty, maintenance schedules, employees, attendance, leave, tasks, 5 new reports
+- [ ] Phase 4 follow-ups: SMS/WhatsApp job updates to customers (needs a provider), customer signature capture on a tablet, technician mobile layout polish
 - [ ] Phase 3 follow-ups: emailing invoices (needs an email provider), bank statement reconciliation, credit note PDF, GSTR-format exports (only after accountant validation)
-- [ ] **Phase 4:** service tickets, technicians, maintenance schedules, employees, tasks
 - [ ] **Phase 5:** documents (secure upload), analytics, report exports
 - [ ] **Phase 6:** device inventory, monitoring agent, uptime/latency, CCTV assets
 - [ ] **Phase 7:** endpoint security visibility (Defender status/events)

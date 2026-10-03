@@ -1,4 +1,5 @@
 import itertools
+import shutil
 
 import pytest
 from alembic import command
@@ -13,13 +14,22 @@ from app.security import login_limiter
 _counter = itertools.count()
 
 
-@pytest.fixture()
-def client(tmp_path):
-    """Fresh database per test, built by running the real Alembic migrations."""
-    url = f"sqlite:///{tmp_path / 'test.db'}"
+@pytest.fixture(scope="session")
+def migrated_template(tmp_path_factory):
+    """Run the real Alembic migrations once; each test gets a copy of the result."""
+    path = tmp_path_factory.mktemp("template") / "template.db"
     cfg = Config("alembic.ini")
-    cfg.attributes["database_url"] = url
+    cfg.attributes["database_url"] = f"sqlite:///{path}"
     command.upgrade(cfg, "head")
+    return path
+
+
+@pytest.fixture()
+def client(tmp_path, migrated_template):
+    """Fresh database per test: a copy of the migrated template."""
+    db_path = tmp_path / "test.db"
+    shutil.copyfile(migrated_template, db_path)
+    url = f"sqlite:///{db_path}"
     engine = make_engine(url)
     Session = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 

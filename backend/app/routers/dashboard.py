@@ -7,13 +7,14 @@ from sqlalchemy import func, select
 from ..deps import OrgContext, require
 from ..models import AuditLog, Customer, Product, StockLevel, StockMovement, User
 from ..models_finance import FinanceEntry
+from ..models_service import Asset, MaintenanceSchedule, ServiceTicket, Task
 from ..models_trade import Payment, PurchaseInvoice, SalesInvoice
 from ..services.timeutil import BUSINESS_TZ, today as local_today
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
 # Modules whose metrics are not built yet. Reported explicitly so the UI never shows fake numbers.
-PENDING_MODULES = ["service", "network", "endpoint_security"]
+PENDING_MODULES = ["network", "endpoint_security"]
 LIVE_SALES = ["issued", "partially_paid", "paid"]
 
 
@@ -108,6 +109,32 @@ def summary(ctx: OrgContext = Depends(require("dashboard.view")),
         FinanceEntry.organization_id == org, FinanceEntry.kind == "expense", FinanceEntry.voided_at.is_(None),
         FinanceEntry.entry_date >= d0, FinanceEntry.entry_date <= d1)))
 
+    open_states = ("new", "assigned", "in_progress", "waiting_parts", "waiting_customer")
+
+    def count(q):
+        return db.scalar(select(func.count()).select_from(q.subquery()))
+
+    tickets = select(ServiceTicket.id).where(ServiceTicket.organization_id == org)
+    service = {
+        "open_tickets": count(tickets.where(ServiceTicket.status.in_(open_states))),
+        "waiting_parts": count(tickets.where(ServiceTicket.status == "waiting_parts")),
+        "awaiting_approval": count(tickets.where(ServiceTicket.status.in_(open_states),
+                                                 ServiceTicket.customer_approval == "pending")),
+        "pending_installations": count(tickets.where(ServiceTicket.ticket_type == "installation",
+                                                     ServiceTicket.status.in_(open_states))),
+        "completed_in_period": count(tickets.where(ServiceTicket.completed_at >= start,
+                                                   ServiceTicket.completed_at < end)),
+        "maintenance_due_30d": count(select(MaintenanceSchedule.id).where(
+            MaintenanceSchedule.organization_id == org, MaintenanceSchedule.is_active.is_(True),
+            MaintenanceSchedule.next_due <= today + timedelta(days=30))),
+        "warranty_expiring_30d": count(select(Asset.id).where(
+            Asset.organization_id == org, Asset.status == "active", Asset.warranty_until >= today,
+            Asset.warranty_until <= today + timedelta(days=30))),
+        "overdue_tasks": count(select(Task.id).where(Task.organization_id == org,
+                                                     Task.status.in_(["todo", "in_progress"]),
+                                                     Task.due_date < today)),
+    }
+
     sales_daily = db.execute(
         select(SalesInvoice.invoice_date, func.sum(SalesInvoice.total))
         .where(SalesInvoice.organization_id == org, SalesInvoice.status.in_(LIVE_SALES),
@@ -148,6 +175,7 @@ def summary(ctx: OrgContext = Depends(require("dashboard.view")),
             "paid_in_period": str(pay_sum("out")),
         },
         "expenses": {"paid_in_period": str(expenses_period)},
+        "service": service,
         "trends": {
             "sales_per_day": [{"date": str(d), "total": str(v)} for d, v in sales_daily],
             "purchases_per_day": [{"date": str(d), "total": str(v)} for d, v in purchase_daily],

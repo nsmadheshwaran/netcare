@@ -17,6 +17,9 @@ import Payments from "./pages/Payments";
 import { Invoices, Quotations } from "./pages/Sales";
 import { Expenses, Finance } from "./pages/Finance";
 import Reports from "./pages/Reports";
+import Service from "./pages/Service";
+import Assets from "./pages/Assets";
+import { Employees, MyWork, Tasks } from "./pages/People";
 
 if (localStorage.getItem("netcare.theme") === "dark") document.documentElement.classList.add("dark");
 
@@ -46,6 +49,11 @@ createRoot(document.getElementById("root")!).render(
             <Route path="expenses" element={<Expenses />} />
             <Route path="finance" element={<Finance />} />
             <Route path="reports" element={<Reports />} />
+            <Route path="service" element={<Service />} />
+            <Route path="assets" element={<Assets />} />
+            <Route path="employees" element={<Employees />} />
+            <Route path="tasks" element={<Tasks />} />
+            <Route path="my-work" element={<MyWork />} />
             <Route path="users" element={<Users />} />
             <Route path="audit" element={<Audit />} />
             <Route path="settings" element={<Settings />} />

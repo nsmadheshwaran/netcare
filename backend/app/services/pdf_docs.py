@@ -12,6 +12,7 @@ from reportlab.pdfgen import canvas
 from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from .export import inr
+from .timeutil import BUSINESS_TZ
 
 ONES = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve",
         "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"]
@@ -279,6 +280,105 @@ def thermal_receipt_pdf(org, inv, customer) -> bytes:
     text("Thank you!", 9, True, "c")
     c.showPage()
     c.save()
+    return buf.getvalue()
+
+
+def service_report_pdf(org, t, customer, installed=()) -> bytes:
+    """Job sheet / completion report for a service ticket. `t` is a TicketOut with parts and events;
+    `installed` are assets registered by this ticket."""
+    st = _styles()
+    buf = io.BytesIO()
+    pdf = SimpleDocTemplate(buf, pagesize=A4, leftMargin=14 * mm, rightMargin=14 * mm, topMargin=10 * mm,
+                            bottomMargin=12 * mm, title=f"Service report {t.number}", author=org.name)
+    done = t.status in ("completed", "closed")
+    title = "SERVICE COMPLETION REPORT" if done else "SERVICE JOB SHEET"
+    logo = _logo(org)
+    meta = [("Ticket no.", t.number), ("Type", t.ticket_type.title()), ("Status", t.status.replace("_", " ").title()),
+            ("Opened", t.created_at.astimezone(BUSINESS_TZ).strftime("%d-%m-%Y"))]
+    if t.completed_at:
+        meta.append(("Completed", t.completed_at.astimezone(BUSINESS_TZ).strftime("%d-%m-%Y")))
+    right = [Paragraph(title, st["title"])] + [Paragraph(f"{esc(k)}: <b>{esc(str(v))}</b>", st["right"])
+                                              for k, v in meta]
+    story = [Table([[([logo] if logo else []) + _org_block(org, st), right]], colWidths=[100 * mm, 82 * mm],
+                   style=[("VALIGN", (0, 0), (-1, -1), "TOP")]), Spacer(1, 4 * mm)]
+
+    cust = [Paragraph("<b>Customer</b>", st["small"]), _p(customer.business_name or customer.name, st["bold"])]
+    for x in (t.contact_name, t.contact_phone, customer.shipping_address or customer.billing_address):
+        if x:
+            cust.append(_p(x, st["base"]))
+    equip_name = t.asset_name or t.equipment or (f"{len(installed)} item(s) installed, listed below" if installed
+                                                  else "Not specified")
+    equip = [Paragraph("<b>Equipment</b>", st["small"]), _p(equip_name, st["bold"])]
+    if t.serial_number:
+        equip.append(_p(f"Serial no.: {t.serial_number}", st["base"]))
+    if t.accessories_received:
+        equip.append(_p(f"Received with: {t.accessories_received}", st["base"]))
+    if t.technician_name:
+        equip.append(_p(f"Technician: {t.technician_name}", st["base"]))
+    story.append(Table([[cust, equip]], colWidths=[91 * mm, 91 * mm],
+                       style=[("BOX", (0, 0), (-1, -1), 0.4, colors.HexColor("#94a3b8")),
+                              ("LINEAFTER", (0, 0), (0, 0), 0.4, colors.HexColor("#94a3b8")),
+                              ("VALIGN", (0, 0), (-1, -1), "TOP")]))
+
+    for label, text in (("Reported problem" if t.ticket_type != "installation" else "Job", t.reported_problem),
+                        ("Diagnosis", t.diagnosis), ("Work performed", t.work_performed),
+                        ("Resolution / advice", t.resolution)):
+        if not text and done:
+            continue  # a finished report leaves out empty sections; a job sheet keeps them to fill in by hand
+        story += [Spacer(1, 3 * mm), Paragraph(f"<b>{label}</b>", st["small"]),
+                  _p(text or "", st["base"]) if text else Spacer(1, 12 * mm)]
+
+    if installed:
+        rows = [[Paragraph(f"<b>{h}</b>", st["small"]) for h in ("Equipment", "Serial no.", "Location", "IP address",
+                                                               "Warranty until")]]
+        for a in installed:
+            rows.append([_p(f"{a.name} ({a.asset_type})", st["small"]), _p(a.serial_number or "", st["small"]),
+                         _p(a.site_location or "", st["small"]), _p(a.ip_address or "", st["small"]),
+                         _p(a.warranty_until.strftime("%d-%m-%Y") if a.warranty_until else "", st["small"])])
+        tbl = Table(rows, colWidths=[50 * mm, 36 * mm, 40 * mm, 28 * mm, 28 * mm], repeatRows=1)
+        tbl.setStyle(TableStyle([("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#cbd5e1")),
+                                 ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e0e7ff"))]))
+        story += [Spacer(1, 4 * mm), Paragraph("<b>Equipment installed</b>", st["small"]), tbl]
+
+    parts = [p for p in t.parts if not p.returned]
+    if parts or t.labour_charge:
+        rows = [[Paragraph(f"<b>{h}</b>", st["small"]) for h in ("Item", "Qty", "Rate", "Amount")]]
+        for p in parts:
+            rows.append([_p(p.product_name, st["small"]), f"{Decimal(p.quantity).normalize():f}", inr(p.unit_price),
+                         inr(Decimal(p.quantity) * Decimal(p.unit_price))])
+        if t.labour_charge:
+            rows.append([_p("Labour / service charges", st["small"]), "", "", inr(t.labour_charge)])
+        rows.append([Paragraph("<b>Total before tax</b>", st["small"]), "", "",
+                     Paragraph(f"<b>{inr(t.parts_total + t.labour_charge)}</b>", st["right"])])
+        tbl = Table(rows, colWidths=[110 * mm, 20 * mm, 26 * mm, 26 * mm])
+        tbl.setStyle(TableStyle([("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#cbd5e1")),
+                                 ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e0e7ff")),
+                                 ("ALIGN", (1, 1), (-1, -1), "RIGHT"), ("FONTSIZE", (0, 1), (-1, -1), 8)]))
+        story += [Spacer(1, 4 * mm), Paragraph("<b>Parts and charges</b>", st["small"]), tbl]
+        if t.is_warranty:
+            story.append(_p("Warranty job: no charge to the customer.", st["bold"]))
+        elif t.invoice_number:
+            story.append(_p(f"Billed on invoice {t.invoice_number} (tax shown on the invoice).", st["base"]))
+        else:
+            story.append(_p("Amounts exclude GST. A tax invoice will be issued separately.", st["small"]))
+
+    if t.estimate_amount is not None:
+        appr = {"pending": "awaiting customer approval", "approved": "approved by customer",
+                "declined": "declined by customer", "not_required": "approval not required"}[t.customer_approval]
+        line = f"Estimate: Rs {inr(t.estimate_amount)}, {appr}"
+        if t.approved_at:
+            line += f" on {t.approved_at.astimezone(BUSINESS_TZ):%d-%m-%Y}"
+        if t.approval_note:
+            line += f" ({t.approval_note})"
+        story += [Spacer(1, 3 * mm), _p(line, st["base"])]
+
+    sig = Table([[Paragraph("Customer signature<br/><br/><br/>Name:", st["base"]),
+                  Paragraph(f"For <b>{esc(org.name)}</b><br/><br/><br/>Technician / authorised signatory",
+                            st["right"])]], colWidths=[91 * mm, 91 * mm])
+    story += [Spacer(1, 10 * mm), sig, Spacer(1, 4 * mm),
+              Paragraph("Please check your equipment before signing. This is a computer-generated document.",
+                        st["small"])]
+    pdf.build(story)
     return buf.getvalue()
 
 

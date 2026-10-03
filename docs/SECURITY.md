@@ -11,6 +11,10 @@
   referencing categories and locations of another tenant.
 - **Authorization:** role permissions are enforced in the API (`deps.require`). The UI only hides buttons.
   Only owners can grant or remove the owner role, and an organization always keeps at least one active owner.
+- **Technician scope:** technicians (`service.work`) can change only tickets assigned to their own employee
+  record. The API enforces this, not just the UI. Closing, cancelling, assigning and billing are office
+  actions. Nobody except the owner can approve their own leave. Employee records can only be linked to logins
+  that are members of the same business.
 - **Input validation:** Pydantic validates every request (GSTIN, PIN, HSN/SAC, email, decimal precision). The
   ORM parameterises all SQL.
 - **CSV:** imports are limited to 2 MB, UTF-8 only, and preview first. Exports prefix cells starting with

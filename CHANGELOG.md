@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.4.0 (2026-10-03): Phase 4, service and employees
+### Added
+- Service tickets (repair, installation, maintenance, complaint) with an enforced status workflow, priorities,
+  technician assignment, visit scheduling and a timeline of notes and changes.
+- Estimates need recorded customer approval before work can start. Warranty jobs skip approval and billing.
+- Parts used on a job leave stock immediately at moving-average cost; unused parts can be returned.
+  Billing a ticket creates a draft invoice whose part lines do not deduct stock again. Cancelling that invoice
+  does not restock the parts, and the ticket can be invoiced again.
+- Technician permission (`service.work`): only tickets assigned to your own employee record. Closing and
+  cancelling are office-only.
+- Customer equipment (assets) with warranty status, IP, site location, service history and replacements.
+  Completed installations register equipment and can start a maintenance schedule in one step.
+- Maintenance schedules that create visit tickets and roll forward from the completion date.
+- Employees (optionally linked to logins), attendance (bulk daily entry, corrections audited), leave requests
+  with approval (approved leave marks attendance; nobody approves their own leave except the owner), tasks.
+- My work page; job sheet and completion report PDFs (installations list the equipment installed).
+- Reports: service performance, warranty expiry, maintenance due, task completion, attendance. Dashboard service tiles.
+- Migration `0004`. Test count: 70 backend tests (was 60).
+
+### Changed
+- Tests copy a database migrated once per session instead of migrating per test (66 s to about 20 s).
+
+### Fixed
+- An invalid item in the equipment registration list returned a server error instead of a validation error.
+
+
 ## 0.3.0 (2026-10-02): Phase 3, finance, GST support and documents
 ### Added
 - Money accounts (cash, bank, other) with opening balances and defaults. Payments now record which account

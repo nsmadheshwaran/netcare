@@ -198,7 +198,7 @@ def test_every_report_in_every_format(tenant):
     receive_stock(tenant, loc, sup, cam, "3")
     sell(tenant, cust, loc, [{"product_id": cam["id"], "quantity": "1"}], due_date=TODAY)
     keys = [c["key"] for c in tenant.get("/api/v1/reports").json()]
-    assert len(keys) == 10
+    assert len(keys) == 15
     for key in keys:
         for fmt in ("json", "csv", "xlsx", "pdf"):
             r = tenant.get(f"/api/v1/reports/{key}?format={fmt}")

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { AlertTriangle, Boxes, HandCoins, IndianRupee, Package, Receipt, ShoppingCart, UserPlus, Users, Wallet } from "lucide-react";
+import { AlertTriangle, Boxes, CalendarClock, HandCoins, IndianRupee, Package, Receipt, ShieldAlert, ShoppingCart, UserPlus, Users, Wallet, Wrench } from "lucide-react";
 import { api, inr, qty } from "../api";
 import { Badge, Empty, ErrorBanner, PageHeader, Spinner, useAsync } from "../components/ui";
 
@@ -63,6 +63,15 @@ export default function Dashboard() {
             <Stat label="Paid to suppliers in period" value={inr(d.purchases.paid_in_period)} icon={HandCoins} tone="text-slate-600" to="/payments" />
             <Stat label="Expenses paid in period" value={inr(d.expenses.paid_in_period)} icon={Wallet} tone="text-red-600" to="/expenses" />
           </div>
+
+          {d.service && <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+            <Stat label="Open service tickets" value={d.service.open_tickets} icon={Wrench} to="/service" />
+            <Stat label="Pending installations" value={d.service.pending_installations} icon={Wrench} tone="text-amber-600" to="/service" />
+            <Stat label="Waiting for parts" value={d.service.waiting_parts} icon={Package} tone="text-red-600" to="/service" />
+            <Stat label="Jobs completed in period" value={d.service.completed_in_period} icon={Wrench} tone="text-emerald-600" />
+            <Stat label="Maintenance due (30 days)" value={d.service.maintenance_due_30d} icon={CalendarClock} tone="text-amber-600" to="/service" />
+            <Stat label="Warranties expiring (30 days)" value={d.service.warranty_expiring_30d} icon={ShieldAlert} tone="text-amber-600" to="/assets" />
+          </div>}
 
           <div className="card">
             <h3 className="mb-3 font-medium">Sales and purchases (invoiced value incl. tax)</h3>

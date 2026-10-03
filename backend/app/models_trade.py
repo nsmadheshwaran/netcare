@@ -267,6 +267,8 @@ class SalesInvoiceLine(_LineMixin, Base):
     returned_quantity: Mapped[Decimal] = mapped_column(QTY, default=Decimal("0"))
     # Moving-average unit cost captured when the invoice was issued (None for services / free text).
     unit_cost: Mapped[Decimal | None] = mapped_column(MONEY)
+    # Set when the line bills a part already taken from stock on a service ticket: issuing must not deduct again.
+    ticket_part_id: Mapped[int | None] = mapped_column(ForeignKey("ticket_parts.id"))
 
 
 class CreditNote(Base):

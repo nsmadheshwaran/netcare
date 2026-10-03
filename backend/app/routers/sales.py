@@ -14,6 +14,7 @@ from ..schemas_trade import (
     CancelIn, CreditNoteIn, CreditNoteOut, InvoiceIn, InvoiceOut, LineIn, QuotationIn, QuotationOut,
     QuotationStatusIn,
 )
+from ..models_service import ServiceTicket, TicketPart
 from ..services import billing, inventory
 from ..services.timeutil import today
 from ..services.trade import (
@@ -234,6 +235,9 @@ def issue_invoice(inv_id: int, ctx: OrgContext = Depends(require("sales.edit")))
         inv.due_date = inv.invoice_date
     inv.number = billing.next_number(ctx.db, ctx.org_id, "sales_invoice", inv.invoice_date)
     for li in inv.lines:
+        if li.ticket_part_id:
+            li.unit_cost = ctx.db.get(TicketPart, li.ticket_part_id).unit_cost  # already out of stock
+            continue
         if li.product_id and not ctx.db.get(Product, li.product_id).is_service:
             mv = inventory.apply_movement(ctx.db, org_id=ctx.org_id, user_id=ctx.user.id,
                                           product_id=li.product_id, location_id=inv.location_id,
@@ -258,15 +262,18 @@ def cancel_invoice(inv_id: int, body: CancelIn, ctx: OrgContext = Depends(requir
         raise HTTPException(409, "Invoice has payments or credit notes. Void the payments or issue a credit note.")
     if inv.status != "draft":
         for li in inv.lines:
+            if li.ticket_part_id:
+                continue  # parts were used on the job; cancelling the bill doesn't return them
             if li.product_id and not ctx.db.get(Product, li.product_id).is_service:
                 inventory.apply_movement(ctx.db, org_id=ctx.org_id, user_id=ctx.user.id, product_id=li.product_id,
                                          location_id=inv.location_id, movement_type="sale_cancel",
                                          quantity=li.quantity, reference=f"Cancel {inv.number}",
-                                         unit_cost=inventory.sale_cost(ctx.db, ctx.org_id,
-                                                                       f"inv{inv.id}:l{li.id}:sale"),
+                                         unit_cost=li.unit_cost,
                                          idempotency_key=f"inv{inv.id}:l{li.id}:cancel")
     inv.status = "cancelled"
     inv.cancelled_at = utcnow()
+    for t in ctx.db.scalars(select(ServiceTicket).where(ServiceTicket.sales_invoice_id == inv.id)):
+        t.sales_invoice_id = None  # the job can be invoiced again
     inv.cancel_reason = body.reason
     ctx.audit("cancel", "sales_invoice", inv.id, {"number": inv.number, "reason": body.reason})
     ctx.db.commit()
@@ -317,9 +324,7 @@ def create_credit_note(inv_id: int, body: CreditNoteIn, ctx: OrgContext = Depend
             mv_id = inventory.apply_movement(ctx.db, org_id=ctx.org_id, user_id=ctx.user.id,
                                              product_id=li.product_id, location_id=inv.location_id,
                                              movement_type="customer_return", quantity=r.quantity,
-                                             reference=cn.number,
-                                             unit_cost=inventory.sale_cost(ctx.db, ctx.org_id,
-                                                                           f"inv{inv.id}:l{li.id}:sale")).id
+                                             reference=cn.number, unit_cost=li.unit_cost).id
         li.returned_quantity = returned + r.quantity
         cn.lines.append(CreditNoteLine(sales_invoice_line_id=li.id, quantity=r.quantity, taxable_value=taxable,
                                        tax_amount=tax, amount=taxable + tax, stock_movement_id=mv_id))

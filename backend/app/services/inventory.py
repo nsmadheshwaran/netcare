@@ -8,26 +8,20 @@ from sqlalchemy.orm import Session
 from ..models import Location, Product, StockLevel, StockMovement
 
 # Sign applied to the (positive) quantity for each movement type. Adjustments take a signed delta.
-SIGN = {"stock_in": 1, "customer_return": 1, "purchase_receipt": 1, "transfer_in": 1, "sale_cancel": 1,
+SIGN = {"stock_in": 1, "customer_return": 1, "purchase_receipt": 1, "transfer_in": 1, "sale_cancel": 1, "service_part_return": 1,
         "stock_out": -1, "damaged": -1, "supplier_return": -1, "sale": -1, "transfer_out": -1,
         "service_part": -1}
 
 
 # Inflows that bring in goods at a known cost and therefore move the average.
 # Transfers are internal and never change it.
-COST_BEARING_INFLOWS = {"stock_in", "purchase_receipt", "customer_return", "sale_cancel", "adjustment"}
+COST_BEARING_INFLOWS = {"stock_in", "purchase_receipt", "customer_return", "sale_cancel", "adjustment",
+                        "service_part_return"}
 
 
 def _total_on_hand(db: Session, product_id: int) -> Decimal:
     return Decimal(db.scalar(select(func.coalesce(func.sum(StockLevel.quantity), 0))
                              .where(StockLevel.product_id == product_id)))
-
-
-def sale_cost(db: Session, org_id: int, sale_idempotency_key: str) -> Decimal | None:
-    """Unit cost recorded when a line was sold, so returns go back in at the same cost."""
-    m = db.scalar(select(StockMovement).where(StockMovement.organization_id == org_id,
-                                              StockMovement.idempotency_key == sale_idempotency_key))
-    return m.unit_cost if m else None
 
 
 class StockError(HTTPException):

@@ -50,6 +50,20 @@ document never changes if a product price or tax rate changes later.
 | organizations.logo, logo_mime, prices_include_tax_default | Branding and pricing default |
 | quotations / sales_invoices.prices_include_tax | Whether the line prices included GST |
 
+### Migration `0004` (Phase 4)
+| Table / column | Purpose |
+|---|---|
+| employees | Staff; optional `user_id` link to a login (unique per business) |
+| attendance | One row per employee per day (unique); corrections are audited |
+| leave_requests | Pending/approved/rejected/cancelled; approval fills attendance |
+| tasks | Assigned work with priority, due date, optional customer/ticket link |
+| assets | Customer equipment; serial unique per business; `installed_by_ticket_id` is a plain id (no FK) to avoid a cycle with tickets |
+| service_tickets | The job: type, status, technician, estimate/approval, labour, warranty flag, links to schedule and invoice |
+| ticket_parts | Parts used, with the stock movement out and (if returned) back |
+| ticket_events | Append-only timeline |
+| maintenance_schedules | Interval in months, next due, last done |
+| sales_invoice_lines.ticket_part_id | Marks lines whose stock already left on a ticket |
+
 Every business table has an `organization_id` column with `ON DELETE CASCADE` to its organization.
 
 ## Migrations

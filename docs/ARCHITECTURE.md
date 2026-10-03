@@ -82,6 +82,22 @@ Customer site: (future) Windows agent --outbound HTTPS, per-agent revocable toke
 - **Dates.** `services/timeutil.today()` returns the business-local date (UTC+05:30 by default, set by
   `NETCARE_UTC_OFFSET_MINUTES`). Timestamps are stored in UTC; document dates are the business's own dates.
 
+## Service (Phase 4)
+- **Workflow.** `routers/service.py` holds the ticket state machine (`TRANSITIONS`). Guards:
+  - Work can't start while an estimate awaits approval.
+  - Completion requires recorded work.
+  - Cancellation requires all parts returned and no invoice.
+  - Closing a chargeable job requires an invoice.
+- **Permissions.** `_can_work` lets `service.edit` touch any ticket, and `service.work` only tickets assigned
+  to the caller's employee record.
+- **Stock.**
+  - A part used is a `service_part` movement (−).
+  - A part returned is `service_part_return` (+) at the cost it left at.
+  - Ticket invoices mark their part lines with `ticket_part_id`, so issuing skips the stock deduction and copies
+    the part's cost for the profit and loss summary.
+- **Maintenance.** Completing a ticket linked to a schedule sets `last_done` and moves `next_due` forward by
+  the interval (month-end safe).
+
 ## Frontend layout (`frontend/src`)
 - `api.ts`: fetch wrapper and error formatting
 - `auth.tsx`: session and permissions context

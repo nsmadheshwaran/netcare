@@ -115,6 +115,37 @@ Open **Reports**, pick a report and a period, and download it as PDF, Excel or C
 - **Customer dues** shows who to chase.
 - **GST summary** is a **draft** for your accountant. It is not a return to file.
 
+## Service jobs
+1. **New ticket.** Pick the customer and the type (repair, installation, maintenance or complaint). Choose
+   their registered equipment or describe a walk-in item, note what came with it (charger, bag), and assign a
+   technician.
+2. If you give an **estimate**, work can't start until you record the customer's answer (**Customer
+   approved**, with a note such as "by phone").
+3. The technician opens **My work**, starts the job, writes the diagnosis, and adds **parts from stock**.
+   Unused parts can be returned.
+4. Record the **work performed**, then **Mark completed**.
+5. The office clicks **Create invoice**: parts plus labour go onto a draft invoice. Issue it under Sales.
+   Then **Close** the ticket. Warranty jobs close without an invoice.
+6. **Print** a job sheet when equipment comes in, and a completion report when it's done.
+
+## Installations and customer equipment
+- On an installation ticket, use **Register installed equipment** to list each camera, DVR and so on, with
+  serial, location, IP and warranty months. You can tick **Start a maintenance schedule** at the same time.
+- **IT Assets** lists all equipment by customer. Filter **Expiring in 30 days** before calling customers
+  about AMC renewals.
+- **Service management → Maintenance schedules** shows what's due. **Create visit ticket** makes the job, and
+  completing it moves the next due date forward.
+
+## Employees, attendance, leave and tasks
+- Add staff under **Employees**. Tick **Technician** for people who take service jobs, and link their login so
+  they see **My work**.
+- **Attendance:** pick a day, mark each person (or **Mark everyone present**), then save. Corrections are kept
+  in the audit log.
+- **Leave:** staff request it themselves; an owner or manager approves it, and approved days show as leave in
+  attendance.
+- **Tasks:** assign follow-ups with due dates. People tick off their own tasks.
+- NetCare does not calculate salaries, PF, ESI or other statutory dues.
+
 ## Dashboard
 Choose a period (today, week, month, quarter, or Indian financial year starting 1 April) and a location. All
 figures come from your records. Modules that are not built yet are listed under **Not yet available**, and

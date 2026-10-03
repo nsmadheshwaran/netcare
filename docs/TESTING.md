@@ -60,6 +60,23 @@ Each form was type-checked, and the same API calls they make were exercised.
   customer, paying another tenant's invoice; inventory managers cannot approve POs; accountants are
   read-only on sales; technicians see no sales or payments.
 
+## Results at Phase 4 (2026-10-03)
+| Suite | Result |
+|---|---|
+| Backend pytest | **70 passed** (10 new service/people tests); suite time cut from about 66 s to about 20 s by migrating once per session |
+| `alembic check`, data-preservation migration test | passed through `0004`; upgrade, downgrade, upgrade verified on the dev database with data |
+| pyflakes, `tsc`, vitest, Vite build | clean, clean, 3 passed, built |
+| Mutation check | Removing the "don't deduct ticket parts again" rule, and removing the technician ownership check: both made tests fail and were reverted |
+| Live run | Installation job on the running app: 4 cameras used from stock, equipment registered with warranty, invoice of Rs 12,267.28 (10,396 + 18%); stock unchanged on issue (no double deduction); completion report PDF read and improved (it now lists installed equipment and omits empty sections); IT Assets, My work and Employees pages render the data |
+
+Phase 4 test coverage: approval gating; technician ownership and office-only actions; parts out and back;
+completion requires work recorded; closing requires an invoice unless warranty; invoice once; no double
+deduction; part cost reaches the P&L; invoice cancel unlinks the ticket without restocking; installation
+registers assets with warranty and a schedule; duplicate serial; invalid IP (422, not 500); maintenance roll
+forward; asset/customer mismatch; asset replacement; warranty filters and reports; employee/login linking
+rules; attendance upsert, future date, time order; leave overlap, self-approval, approval fills attendance;
+task ownership; month-end date arithmetic; cross-tenant isolation for tickets, assets, employees, tasks and parts.
+
 ## Results at Phase 3 (2026-10-02)
 | Suite | Result |
 |---|---|

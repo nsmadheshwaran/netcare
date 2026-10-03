@@ -12,6 +12,7 @@ from sqlalchemy import select
 from ..deps import OrgContext
 from ..models import Customer, Product, StockLevel, StockMovement
 from ..models_finance import FinanceCategory, FinanceEntry, MoneyAccount
+from ..models_service import Asset, Attendance, Employee, MaintenanceSchedule, ServiceTicket, Task
 from ..models_trade import (
     CreditNote, Payment, PurchaseInvoice, PurchaseReturn, SalesInvoice,
     SalesInvoiceLine, Supplier,
@@ -435,6 +436,140 @@ def stock_valuation(ctx: OrgContext, location_id: int | None = None) -> Report:
         notes=["Valued at moving-average purchase cost."])
 
 
+# ---------------- service and people ----------------
+def _local_range(d0: date, d1: date):
+    return (datetime.combine(d0, time.min, BUSINESS_TZ), datetime.combine(d1 + timedelta(days=1), time.min, BUSINESS_TZ))
+
+
+def service_performance(ctx: OrgContext, d0: date, d1: date) -> Report:
+    start, end = _local_range(d0, d1)
+    emps = {e.id: e.name for e in ctx.db.scalars(select(Employee).where(Employee.organization_id == ctx.org_id))}
+    opened = ctx.db.scalars(select(ServiceTicket).where(ServiceTicket.organization_id == ctx.org_id,
+                                                        ServiceTicket.created_at >= start,
+                                                        ServiceTicket.created_at < end)).all()
+    completed = ctx.db.scalars(select(ServiceTicket).where(ServiceTicket.organization_id == ctx.org_id,
+                                                           ServiceTicket.completed_at >= start,
+                                                           ServiceTicket.completed_at < end)).all()
+    per = defaultdict(lambda: {"assigned": 0, "completed": 0, "hours": [], "parts": ZERO, "labour": ZERO})
+    for t in opened:
+        per[emps.get(t.assigned_to, "Unassigned")]["assigned"] += 1
+    for t in completed:
+        row = per[emps.get(t.assigned_to, "Unassigned")]
+        row["completed"] += 1
+        row["hours"].append((t.completed_at - t.created_at).total_seconds() / 3600)
+        if not t.is_warranty:
+            row["labour"] += t.labour_charge
+            row["parts"] += sum((Decimal(p.quantity) * Decimal(p.unit_price) for p in t.parts
+                                 if p.returned_movement_id is None), ZERO)
+    rows = [{"technician": k, "assigned": v["assigned"], "completed": v["completed"],
+             "avg_days": (f"{sum(v['hours']) / len(v['hours']) / 24:.1f}" if v["hours"] else ""),
+             "labour": v["labour"], "parts": v["parts"]} for k, v in sorted(per.items())]
+    by_type = defaultdict(lambda: defaultdict(int))
+    for t in opened:
+        by_type[t.ticket_type]["opened"] += 1
+    for t in completed:
+        by_type[t.ticket_type]["completed"] += 1
+    open_now = defaultdict(int)
+    for t in ctx.db.scalars(select(ServiceTicket).where(ServiceTicket.organization_id == ctx.org_id,
+                                                        ServiceTicket.status.in_(("new", "assigned", "in_progress",
+                                                                                  "waiting_parts",
+                                                                                  "waiting_customer")))):
+        open_now[t.status] += 1
+    return Report("Service performance", [
+        Column("technician", "Technician"), Column("assigned", "Opened in period", "int"),
+        Column("completed", "Completed", "int"), Column("avg_days", "Avg. days to complete", "pct"),
+        Column("labour", "Labour charged", "money"), Column("parts", "Parts charged", "money")], rows,
+        period_label(d0, d1),
+        totals={"technician": "Total", "assigned": len(opened), "completed": len(completed),
+                "labour": sum((r["labour"] for r in rows), ZERO), "parts": sum((r["parts"] for r in rows), ZERO)},
+        sections=[Report("By type", [Column("type", "Type"), Column("opened", "Opened", "int"),
+                                     Column("completed", "Completed", "int")],
+                         [{"type": k.title(), **v} for k, v in sorted(by_type.items())]),
+                  Report("Open right now", [Column("status", "Status"), Column("count", "Tickets", "int")],
+                         [{"status": k.replace("_", " ").title(), "count": v} for k, v in sorted(open_now.items())])],
+        notes=["Labour and parts are amounts recorded on non-warranty tickets, before GST; invoices are the "
+               "billing record.", "Days to complete are measured from ticket creation to completion."])
+
+
+def warranty_expiry(ctx: OrgContext, as_of: date) -> Report:
+    cust = {c.id: c.name for c in ctx.db.scalars(select(Customer).where(Customer.organization_id == ctx.org_id))}
+    assets = ctx.db.scalars(select(Asset).where(
+        Asset.organization_id == ctx.org_id, Asset.status == "active", Asset.warranty_until.is_not(None),
+        Asset.warranty_until >= as_of - timedelta(days=30), Asset.warranty_until <= as_of + timedelta(days=90))
+        .order_by(Asset.warranty_until)).all()
+    rows = [{"customer": cust[a.customer_id], "asset": a.name, "type": a.asset_type, "serial": a.serial_number or "",
+             "site": a.site_location or "", "warranty_until": a.warranty_until,
+             "days": (a.warranty_until - as_of).days} for a in assets]
+    return Report("Warranty expiry", [
+        Column("customer", "Customer"), Column("asset", "Equipment"), Column("type", "Type"),
+        Column("serial", "Serial no."), Column("site", "Site location"), Column("warranty_until", "Warranty until", "date"),
+        Column("days", "Days left", "int")], rows,
+        f"Expired in the last 30 days or expiring in the next 90, as of {as_of:%d %b %Y}",
+        notes=["Negative days means the warranty has already expired. A good list for AMC renewal calls."])
+
+
+def maintenance_due(ctx: OrgContext, as_of: date) -> Report:
+    cust = {c.id: c.name for c in ctx.db.scalars(select(Customer).where(Customer.organization_id == ctx.org_id))}
+    emps = {e.id: e.name for e in ctx.db.scalars(select(Employee).where(Employee.organization_id == ctx.org_id))}
+    rows = [{"customer": cust[s.customer_id], "title": s.title, "every": f"{s.interval_months} mo",
+             "last_done": s.last_done or "", "next_due": s.next_due, "days": (s.next_due - as_of).days,
+             "technician": emps.get(s.assigned_to, "")}
+            for s in ctx.db.scalars(select(MaintenanceSchedule).where(
+                MaintenanceSchedule.organization_id == ctx.org_id, MaintenanceSchedule.is_active.is_(True),
+                MaintenanceSchedule.next_due <= as_of + timedelta(days=30)).order_by(MaintenanceSchedule.next_due))]
+    return Report("Maintenance due", [
+        Column("customer", "Customer"), Column("title", "Schedule"), Column("every", "Every"),
+        Column("last_done", "Last done", "date"), Column("next_due", "Next due", "date"),
+        Column("days", "Days", "int"), Column("technician", "Technician")], rows,
+        f"Overdue or due within 30 days of {as_of:%d %b %Y}", notes=["Negative days means overdue."])
+
+
+def task_completion(ctx: OrgContext, d0: date, d1: date) -> Report:
+    start, end = _local_range(d0, d1)
+    emps = {e.id: e.name for e in ctx.db.scalars(select(Employee).where(Employee.organization_id == ctx.org_id))}
+    per = defaultdict(lambda: defaultdict(int))
+    t_today = today()
+    for t in ctx.db.scalars(select(Task).where(Task.organization_id == ctx.org_id)):
+        name = emps.get(t.assigned_to, "Unassigned")
+        if t.completed_at and start <= t.completed_at < end:
+            per[name]["done"] += 1
+            if t.due_date and t.completed_at.astimezone(BUSINESS_TZ).date() > t.due_date:
+                per[name]["late"] += 1
+        if t.status in ("todo", "in_progress"):
+            per[name]["open"] += 1
+            if t.due_date and t.due_date < t_today:
+                per[name]["overdue"] += 1
+    rows = [{"employee": k, "done": v["done"], "late": v["late"], "open": v["open"], "overdue": v["overdue"]}
+            for k, v in sorted(per.items())]
+    return Report("Task completion", [
+        Column("employee", "Employee"), Column("done", "Completed in period", "int"),
+        Column("late", "Completed late", "int"), Column("open", "Open now", "int"),
+        Column("overdue", "Overdue now", "int")], rows, period_label(d0, d1),
+        notes=["Based only on tasks recorded in NetCare; it is not a performance appraisal."])
+
+
+def attendance_summary(ctx: OrgContext, d0: date, d1: date) -> Report:
+    emps = ctx.db.scalars(select(Employee).where(Employee.organization_id == ctx.org_id)
+                          .order_by(Employee.name)).all()
+    counts = defaultdict(lambda: defaultdict(int))
+    for a in ctx.db.scalars(select(Attendance).where(Attendance.organization_id == ctx.org_id,
+                                                     Attendance.work_date >= d0, Attendance.work_date <= d1)):
+        counts[a.employee_id][a.status] += 1
+    days = (d1 - d0).days + 1
+    keys = ("present", "half_day", "absent", "leave", "holiday", "week_off")
+    rows = []
+    for e in emps:
+        c = counts.get(e.id, {})
+        if e.status != "active" and not c:
+            continue
+        rows.append({"employee": e.name, **{k: c.get(k, 0) for k in keys},
+                     "unrecorded": days - sum(c.get(k, 0) for k in keys)})
+    return Report("Attendance summary", [Column("employee", "Employee")] +
+                  [Column(k, k.replace("_", " ").title(), "int") for k in keys] +
+                  [Column("unrecorded", "Not recorded", "int")], rows, period_label(d0, d1),
+                  notes=["For record-keeping only. NetCare does not calculate salaries or statutory dues."])
+
+
 CATALOG = {
     "sales-register": ("Sales register", "period", sales_register),
     "purchase-register": ("Purchase register", "period", purchase_register),
@@ -446,4 +581,9 @@ CATALOG = {
     "payables-ageing": ("Supplier dues", "as_of", payables_ageing),
     "gst-summary": ("GST summary (draft)", "period", gst_summary),
     "stock-valuation": ("Stock valuation", "location", stock_valuation),
+    "service-performance": ("Service performance", "period", service_performance),
+    "warranty-expiry": ("Warranty expiry", "as_of", warranty_expiry),
+    "maintenance-due": ("Maintenance due", "as_of", maintenance_due),
+    "task-completion": ("Task completion", "period", task_completion),
+    "attendance": ("Attendance summary", "period", attendance_summary),
 }
