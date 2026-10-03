@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.7.0 (2026-10-03): Phase 7, endpoint security visibility
+### Added
+- Agents can report their PC's Microsoft Defender status (opt-in per agent, Windows, read-only `Get-Mp*`
+  cmdlets every 15 minutes): protection switches, mode, versions, definition and scan times, and detections of
+  the last 30 days. Agent version 1.1.0.
+- Endpoint Security page: each PC rated critical / needs attention / protected / not reporting, with the
+  reasons in plain words and what to do; detection history; link a PC to its equipment record; "Mark
+  reviewed" notes for resolved detections. "Endpoint security" report.
+- Migration `0007`. Test count: 101 backend tests (was 91).
+
+### Fixed
+- Monitoring outages stayed open forever when a check was disabled or its agent revoked, inflating downtime.
+- Editing a document with `null` for title, category or the sensitive flag returned a server error.
+- Checks belonging to a revoked agent could not be edited or disabled.
+
 ## 0.6.0 (2026-10-03): Phase 6, monitoring and CCTV
 ### Added
 - Monitoring agent (`agent/netcare_agent.py`, Python standard library only): fetches its checks, runs ping and

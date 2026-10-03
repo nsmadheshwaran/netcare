@@ -618,8 +618,23 @@ def uptime_report(ctx: OrgContext, d0: date, d1: date) -> Report:
             "Measured from your monitoring agent's network; it is not a service-level guarantee."])
 
 
+def endpoint_security_report(ctx: OrgContext, _location_id=None) -> Report:
+    from ..routers.security import list_endpoints
+    rows = [{"pc": r["hostname"], "site": r["customer_name"] or "", "rating": r["rating"].upper(),
+             "last_report": r["last_report_at"].astimezone(BUSINESS_TZ).strftime("%d %b %Y %H:%M")
+             if r["last_report_at"] else "never",
+             "threats": r["active_threats"], "issues": "; ".join(r["reasons"])} for r in list_endpoints(ctx)]
+    return Report("Endpoint security", [
+        Column("pc", "Computer"), Column("site", "Site"), Column("rating", "Rating"),
+        Column("last_report", "Last report"), Column("threats", "Active threats", "int"),
+        Column("issues", "What needs attention")], rows, "Current status as reported by Microsoft Defender",
+        notes=["NetCare only reads what Defender reports. It does not change settings, scan or remove threats.",
+               "Unknown means the PC has not reported for 24 hours (switched off or agent stopped)."])
+
+
 # Reports that need a permission beyond reports.view.
-REPORT_PERMS = {"documents-expiring": "documents.view", "uptime": "monitoring.view"}
+REPORT_PERMS = {"documents-expiring": "documents.view", "uptime": "monitoring.view",
+                "endpoint-security": "security.view"}
 
 CATALOG = {
     "sales-register": ("Sales register", "period", sales_register),
@@ -639,4 +654,5 @@ CATALOG = {
     "attendance": ("Attendance summary", "period", attendance_summary),
     "documents-expiring": ("Documents expiring", "as_of", documents_expiring),
     "uptime": ("Uptime and latency", "period", uptime_report),
+    "endpoint-security": ("Endpoint security", "location", endpoint_security_report),
 }

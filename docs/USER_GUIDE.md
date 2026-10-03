@@ -157,6 +157,18 @@ Owners and managers set this up; technicians and reception can watch it.
 channel, with warranty and live network status. When adding a camera under IT Assets, choose its recorder
 and channel; a channel can only be used once per recorder.
 
+## Endpoint security
+Shows whether Microsoft Defender is protecting each PC that runs the NetCare agent with **Report this PC's
+Microsoft Defender status** switched on (owners, managers and technicians).
+- **Critical:** antivirus or real-time protection off, Defender missing, or a threat Defender could not remove.
+- **Needs attention:** definitions older than 3 days, no scan in 14 days, tamper protection off, passive mode,
+  a threat a user allowed, or a recent threat nobody has reviewed.
+- **Not reporting:** nothing for 24 hours. The PC may simply be off.
+
+Click a PC for the details and the steps to take. Fix problems on the PC itself (Windows Security, then Virus
+and threat protection). NetCare only shows status; it cannot change settings or remove threats. After a
+threat is removed, **Mark reviewed** with a note of what you checked.
+
 ## Service jobs
 1. **New ticket.** Pick the customer and the type (repair, installation, maintenance or complaint). Choose
    their registered equipment or describe a walk-in item, note what came with it (charger, bag), and assign a

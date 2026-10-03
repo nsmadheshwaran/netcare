@@ -4,6 +4,10 @@ Runs on a computer at a customer's site and reports to NetCare over outbound HTT
 configured for it in NetCare (ping or a TCP connect to one named host and port). It never scans, discovers,
 logs in to devices, runs remote commands or reads files.
 
+If endpoint reporting is switched on for the agent in NetCare, it also reads this PC's Microsoft Defender
+status and recent detections with one fixed, read-only PowerShell query (DEFENDER_PS). It never changes
+Defender settings, starts scans or removes anything.
+
 Standard library only (Python 3.10+). Usage:
     python netcare_agent.py --config agent.json           run until stopped
     python netcare_agent.py --config agent.json --once    run every check once, send, exit (install test)
@@ -28,7 +32,7 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 MAX_QUEUE = 50_000
 BATCH = 500
 HOST_RE = re.compile(r"^(?=.{1,253}$)([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)*"
@@ -102,6 +106,81 @@ def run_check(c: dict) -> dict:
     return {"check_id": c["id"], "observed_at": now_iso(), "ok": ok, "latency_ms": lat, "error": err}
 
 
+# ---------------- endpoint security (Windows Defender, read-only) ----------------
+# Fixed text: nothing from the server or the network is ever inserted into it.
+DEFENDER_PS = r"""
+$ErrorActionPreference = 'Stop'
+function iso($d) { if ($d -and $d.Year -gt 1601) { $d.ToUniversalTime().ToString('o') } else { $null } }
+$os = Get-CimInstance Win32_OperatingSystem
+$out = [ordered]@{ os_name = $os.Caption; os_version = $os.Version; defender = $null; threats = @() }
+try {
+  $s = Get-MpComputerStatus
+  $out.defender = [ordered]@{
+    av_enabled = $s.AntivirusEnabled; realtime_enabled = $s.RealTimeProtectionEnabled
+    antispyware_enabled = $s.AntispywareEnabled; behavior_monitor_enabled = $s.BehaviorMonitorEnabled
+    tamper_protected = $s.IsTamperProtected; running_mode = "$($s.AMRunningMode)"
+    signature_version = "$($s.AntivirusSignatureVersion)"; signature_updated_at = iso $s.AntivirusSignatureLastUpdated
+    engine_version = "$($s.AMEngineVersion)"; product_version = "$($s.AMProductVersion)"
+    quick_scan_at = iso $s.QuickScanEndTime; full_scan_at = iso $s.FullScanEndTime }
+  $names = @{}; foreach ($t in @(Get-MpThreat)) { $names["$($t.ThreatID)"] = $t }
+  $since = (Get-Date).AddDays(-30)
+  $out.threats = @(foreach ($d in @(Get-MpThreatDetection)) {
+    if ($d.InitialDetectionTime -lt $since) { continue }
+    $t = $names["$($d.ThreatID)"]
+    [ordered]@{ detection_id = "$($d.DetectionID)"; threat_id = "$($d.ThreatID)"
+      threat_name = $(if ($t) { $t.ThreatName } else { "Threat $($d.ThreatID)" })
+      severity_id = $(if ($t) { [int]$t.SeverityID } else { $null })
+      category_id = $(if ($t) { [int]$t.CategoryID } else { $null })
+      status_id = [int]$d.ThreatStatusID; action_success = $d.ActionSuccess
+      detected_at = iso $d.InitialDetectionTime; resources = ($d.Resources -join "; ") } })
+} catch { $out.defender = $null }
+$out | ConvertTo-Json -Depth 4 -Compress
+"""
+CATEGORY = {1: "adware", 2: "spyware", 3: "password stealer", 4: "trojan downloader", 5: "worm", 6: "backdoor",
+            8: "trojan", 10: "keylogger", 12: "monitoring software", 13: "browser modifier",
+            19: "remote control software", 21: "hacktool", 23: "potentially unwanted", 27: "exploit",
+            30: "ransomware", 32: "behavior", 34: "known bad", 42: "potentially unwanted"}
+
+
+def parse_defender(raw: str, hostname: str) -> dict:
+    """Turn the PowerShell JSON into the report NetCare expects. Pure function, unit tested."""
+    data = json.loads(raw)
+    threats = data.get("threats") or []
+    if isinstance(threats, dict):  # ConvertTo-Json unwraps single-item arrays
+        threats = [threats]
+    out = []
+    for t in threats:
+        if not t.get("detection_id") or not t.get("detected_at"):
+            continue
+        out.append({"detection_id": t["detection_id"].strip("{}")[:64],
+                    "threat_name": (t.get("threat_name") or "?")[:200], "severity_id": t.get("severity_id"),
+                    "category": CATEGORY.get(t.get("category_id")), "status_id": t.get("status_id"),
+                    "action_success": t.get("action_success"), "detected_at": t["detected_at"],
+                    "resources": (t.get("resources") or None) and t["resources"][:4000]})
+    d = data.get("defender")
+    if d:
+        d = {k: (v or None) if isinstance(v, str) else v for k, v in d.items()}
+    return {"hostname": hostname[:100], "os_name": data.get("os_name") or None,
+            "os_version": data.get("os_version") or None, "defender": d, "threats": out}
+
+
+def collect_defender() -> dict | None:
+    """Run DEFENDER_PS. None on non-Windows or when PowerShell is unavailable."""
+    if platform.system() != "Windows":
+        return None
+    try:
+        p = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+                            "-Command", DEFENDER_PS], capture_output=True, text=True, timeout=120,
+                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    except (OSError, subprocess.TimeoutExpired) as e:
+        log.warning("could not read Defender status: %s", e)
+        return None
+    if p.returncode != 0 or not p.stdout.strip():
+        log.warning("could not read Defender status: %s", p.stderr.strip()[:300])
+        return None
+    return parse_defender(p.stdout, socket.gethostname())
+
+
 # ---------------- queue ----------------
 class Queue:
     """Results waiting to be sent, kept on disk so a restart or a long outage loses nothing (up to MAX_QUEUE)."""
@@ -170,6 +249,8 @@ class Agent:
         self.queue = Queue(queue_file)
         self.checks: list[dict] = []
         self.refresh_seconds = 300
+        self.collect_endpoint = False
+        self.endpoint_seconds = 900
 
     def _call(self, method: str, path: str, payload=None) -> dict:
         body = json.dumps(payload).encode() if payload is not None else None
@@ -184,6 +265,8 @@ class Agent:
         cfg = self._call("GET", "/config")
         self.checks = [c for c in cfg["checks"] if c["kind"] in ("icmp", "tcp")]
         self.refresh_seconds = int(cfg.get("config_refresh_seconds", 300))
+        self.collect_endpoint = bool(cfg.get("collect_endpoint"))
+        self.endpoint_seconds = max(300, int(cfg.get("endpoint_report_seconds", 900)))
         log.info("config: %d checks", len(self.checks))
 
     def flush(self) -> int:
@@ -198,15 +281,28 @@ class Agent:
             sent += len(batch)
         return sent
 
+    def report_endpoint(self, collector=None) -> bool:
+        """Send this PC's Defender status if NetCare asked for it. Not queued: only the latest status matters."""
+        if not self.collect_endpoint:
+            return False
+        report = (collector or collect_defender)()
+        if report is None:
+            return False
+        self._call("POST", "/endpoint", report)
+        log.info("endpoint security reported (%d detections)", len(report["threats"]))
+        return True
+
     def run_once(self) -> int:
         self.fetch_config()
         with ThreadPoolExecutor(max_workers=16) as pool:
             self.queue.add(list(pool.map(run_check, self.checks)))
+        self.report_endpoint()
         return self.flush()
 
     def run_forever(self):  # pragma: no cover - exercised by hand; parts are unit tested
         next_due: dict[int, float] = {}
         last_config = 0.0
+        last_endpoint = -1e9
         backoff = 5.0
         next_send = 0.0
         pool = ThreadPoolExecutor(max_workers=16)
@@ -226,6 +322,9 @@ class Agent:
                 if now >= next_send and len(self.queue):
                     self.flush()
                     backoff, next_send = 5.0, now + 15
+                if self.collect_endpoint and now - last_endpoint >= self.endpoint_seconds:
+                    last_endpoint = now  # also on failure: retried at the next interval, not every second
+                    self.report_endpoint()
             except Revoked:
                 raise
             except (OSError, ValueError) as e:

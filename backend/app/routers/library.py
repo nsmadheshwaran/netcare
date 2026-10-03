@@ -249,13 +249,14 @@ def update_document(doc_id: int, body: DocUpdate, ctx: OrgContext = Depends(requ
     d = _get(ctx, doc_id)
     _check_edit_target(ctx, d.entity_type, _target(ctx, d.entity_type, d.entity_id))
     changes = body.model_dump(exclude_unset=True)
-    if "category" in changes and changes["category"] not in CATEGORIES:
+    if changes.get("category") is not None and changes["category"] not in CATEGORIES:
         raise HTTPException(422, f"category must be one of {CATEGORIES}")
-    if "is_sensitive" in changes and changes["is_sensitive"] != d.is_sensitive \
+    if changes.get("is_sensitive") is not None and changes["is_sensitive"] != d.is_sensitive \
             and not _can(ctx, "documents.sensitive"):
         raise HTTPException(403, "Only owners and managers can change the sensitive flag")
-    if changes.get("title") is None:
-        changes.pop("title", None)
+    for k in ("title", "category", "is_sensitive"):  # not nullable: null means "leave unchanged"
+        if k in changes and changes[k] is None:
+            changes.pop(k)
     for k, v in changes.items():
         setattr(d, k, v)
     ctx.audit("update", "document", d.id, {"fields": list(changes)})

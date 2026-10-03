@@ -236,3 +236,10 @@ def test_analytics_overview(client):
                      params={"date_from": TODAY, "date_to": "2020-01-01"}).status_code == 422
     # Permission: salesperson has no analytics
     assert add_member(owner, "salesperson").get("/api/v1/analytics/overview").status_code == 403
+
+
+def test_document_patch_nulls_do_not_break(tenant):
+    d = tenant.upload(PDF, "x.pdf").json()
+    r = tenant.patch(f"/api/v1/documents/{d['id']}", json={"title": None, "category": None, "is_sensitive": None,
+                                                           "notes": None})
+    assert r.status_code == 200 and r.json()["title"] == "x" and r.json()["category"] == "other"

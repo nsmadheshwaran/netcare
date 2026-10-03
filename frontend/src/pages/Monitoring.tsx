@@ -6,7 +6,7 @@ import { useAuth } from "../auth";
 import { useCustomers } from "../components/trade";
 import { Badge, confirmAction, Empty, ErrorBanner, Field, Modal, PageHeader, Spinner, useAsync } from "../components/ui";
 
-type Agent = { id: number; name: string; customer_id: number | null; customer_name: string | null; site_note: string | null; token_prefix: string; status: string; online: boolean; last_seen_at: string | null; last_ip: string | null; agent_version: string | null; hostname: string | null; checks: number };
+type Agent = { id: number; collect_endpoint: boolean; name: string; customer_id: number | null; customer_name: string | null; site_note: string | null; token_prefix: string; status: string; online: boolean; last_seen_at: string | null; last_ip: string | null; agent_version: string | null; hostname: string | null; checks: number };
 export type Check = { id: number; agent_id: number; agent_name: string; asset_id: number | null; asset_name: string | null; customer_name: string | null; name: string; kind: "icmp" | "tcp"; host: string; port: number | null; interval_seconds: number; timeout_ms: number; failure_threshold: number; latency_warn_ms: number | null; enabled: boolean; status: string; stored_status: string; status_since: string | null; last_checked_at: string | null; last_latency_ms: number | null; last_error: string | null; consecutive_failures: number };
 type Window = { samples: number; uptime_pct: number | null; avg_latency_ms: number | null; p95_latency_ms: number | null; incidents: number; downtime_minutes: number };
 type Stats = { windows: Record<"24h" | "7d" | "30d", Window>; series: { t: string; samples: number; failures: number; avg_latency_ms: number | null }[]; incidents: { id: number; started_at: string; ended_at: string | null; reason: string | null; minutes: number }[] };
@@ -44,11 +44,11 @@ function AgentToken({ agent, token }: { agent: Agent; token: string }) {
 
 function AgentForm({ initial, onDone }: { initial: Partial<Agent>; onDone: (created?: { agent: Agent; token: string }) => void }) {
   const customers = useCustomers();
-  const [f, setF] = useState<any>({ name: "", customer_id: "", site_note: "", ...initial });
+  const [f, setF] = useState<any>({ name: "", customer_id: "", site_note: "", collect_endpoint: false, ...initial });
   const [error, setError] = useState<string | null>(null);
   async function submit(e: FormEvent) {
     e.preventDefault();
-    const body = { name: f.name, customer_id: f.customer_id ? Number(f.customer_id) : null, site_note: f.site_note || null };
+    const body = { name: f.name, customer_id: f.customer_id ? Number(f.customer_id) : null, site_note: f.site_note || null, collect_endpoint: !!f.collect_endpoint };
     try {
       if (f.id) { await api(`/monitoring/agents/${f.id}`, { method: "PUT", json: body }); onDone(); }
       else { const r = await api<Agent & { token: string }>("/monitoring/agents", { method: "POST", json: body }); onDone({ agent: r, token: r.token }); }
@@ -61,6 +61,8 @@ function AgentForm({ initial, onDone }: { initial: Partial<Agent>; onDone: (crea
       <Field label="Customer site"><select className="input" value={f.customer_id ?? ""} onChange={(e) => setF({ ...f, customer_id: e.target.value })}>
         <option value="">Your own office / not a customer site</option>{customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></Field>
       <Field label="Where it runs"><input className="input" maxLength={200} placeholder="Reception desktop, server room" value={f.site_note ?? ""} onChange={(e) => setF({ ...f, site_note: e.target.value })} /></Field>
+      <label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1" checked={!!f.collect_endpoint} onChange={(e) => setF({ ...f, collect_endpoint: e.target.checked })} />
+        <span>Report this PC's Microsoft Defender status<span className="block text-xs text-slate-500">Read-only: protection settings, definition age, scans and detections, shown under Endpoint Security. Windows only.</span></span></label>
       <p className="text-xs text-slate-500">Install agents only on networks you are authorised to monitor.</p>
       <div className="flex justify-end gap-2"><button type="button" className="btn-ghost" onClick={() => onDone()}>Cancel</button><button className="btn-primary">Save</button></div>
     </form>

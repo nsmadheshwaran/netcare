@@ -60,6 +60,22 @@ Each form was type-checked, and the same API calls they make were exercised.
   customer, paying another tenant's invoice; inventory managers cannot approve POs; accountants are
   read-only on sales; technicians see no sales or payments.
 
+## Results at Phase 7 (2026-10-03)
+| Suite | Result |
+|---|---|
+| Backend pytest | **101 passed**: 7 new endpoint-security tests, plus 3 from a bug sweep of Phases 5 and 6 (including a smoke test calling every list endpoint) |
+| `alembic check`, upgrade/downgrade/upgrade | passed through `0007` |
+| pyflakes (app, tests, agent), `tsc`, vitest, Vite build | clean |
+| Live run | The real agent read this development PC's Defender status (Windows 11, all protection on, definitions current) and its 30-day detections; NetCare rated the PC critical because one detection is in "remove failed" state, and the page showed the reasons and the steps to take |
+| Bugs fixed in the sweep | Outages stayed "ongoing" forever when a check was disabled or its agent revoked; a document PATCH with `null` for title/category/sensitive caused a 500; checks of a revoked agent could not be edited or disabled |
+
+Phase 7 test coverage: every rating rule (protection off, passive mode, old definitions, no scan, missing
+Defender, active/allowed/recent/old/acknowledged detections, stale report); report ingest and detection
+upsert; acknowledgement refused while active and cleared when a threat returns; opt-in (403), revoked agent
+(401), roles and cross-tenant isolation; linking equipment (computer only, one endpoint per asset); future
+timestamps; agent parsing of real PowerShell JSON shapes (single detection unwrapped, empty strings); the
+query text contains no state-changing cmdlets; end-to-end report through the real API.
+
 ## Results at Phase 6 (2026-10-03)
 | Suite | Result |
 |---|---|

@@ -135,6 +135,15 @@ Customer site: (future) Windows agent --outbound HTTPS, per-agent revocable toke
 - **CCTV.** Cameras link to a DVR/NVR (`assets.recorder_id`, `channel`, unique per recorder) at the same
   customer. Equipment shows the worst effective status of its enabled checks (`monitor_status`).
 
+## Endpoint security (Phase 7)
+- The agent posts a report to `POST /api/v1/agent/endpoint` when its agent has `collect_endpoint` on
+  (otherwise 403). `services/endpoint_security.ingest_report` upserts the `endpoints` row by (agent, hostname)
+  and detections by Defender's `DetectionID`, so repeated reports update the status instead of duplicating.
+- `evaluate()` rates a PC critical / warning / ok / unknown and returns the reasons in plain words, worst first.
+  It runs at read time, so "unknown after 24 hours" needs no background job.
+- An acknowledgement records that someone reviewed a resolved detection. Active detections cannot be
+  acknowledged (409), and an acknowledgement is cleared if the detection becomes active again.
+
 ## Frontend layout (`frontend/src`)
 - `api.ts`: fetch wrapper and error formatting
 - `auth.tsx`: session and permissions context

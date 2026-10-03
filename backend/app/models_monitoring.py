@@ -29,6 +29,8 @@ class MonitorAgent(TimestampMixin, Base):
     last_ip: Mapped[str | None] = mapped_column(String(45))
     agent_version: Mapped[str | None] = mapped_column(String(20))
     hostname: Mapped[str | None] = mapped_column(String(100))
+    # Phase 7: also report this PC's Microsoft Defender status (read-only). Opt-in per agent.
+    collect_endpoint: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
 
 

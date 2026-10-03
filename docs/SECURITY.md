@@ -37,6 +37,10 @@
   runs `ping` (argument list, no shell, so no option or command injection). The agent opens no ports and talks
   HTTPS only. Managing agents and checks needs `monitoring.manage` (owners and managers), and every change is
   audited. See [MONITORING_AGENT](MONITORING_AGENT.md).
+- **Endpoint security:** opt-in per agent and read-only. The agent runs a fixed PowerShell query (no input
+  from the server) using only `Get-*` Defender cmdlets; NetCare cannot change Defender, scan or delete. Reports
+  are accepted only from agents with endpoint reporting switched on. Detection file paths can contain Windows
+  user names, so the pages need `security.view` (owner, manager, technician).
 - **PDFs:** user-entered text is XML-escaped before ReportLab renders it, so names like `A & B <Traders>`
   cannot break or inject markup.
 - **Reports:** limited to a three-year span per request to bound load; every report run is audited.

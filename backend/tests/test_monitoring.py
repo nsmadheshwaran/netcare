@@ -330,3 +330,21 @@ def test_agent_end_to_end(tenant, client, listener, tmp_path):
     tenant.post(f"/api/v1/monitoring/agents/{a['id']}/revoke")
     with pytest.raises(netcare_agent.Revoked):
         agent.run_once()
+
+
+def test_outages_close_when_monitoring_stops(tenant, client):
+    a = make_agent(tenant)
+    c1 = make_check(tenant, a, failure_threshold=1)
+    c2 = make_check(tenant, a, name="Switch", host="192.168.1.2", failure_threshold=1)
+    send(client, a["token"], (c1["id"], ts(2), False, None), (c2["id"], ts(2), False, None))
+    body = {"agent_id": a["id"], "name": "Router", "kind": "icmp", "host": "192.168.1.1", "failure_threshold": 1,
+            "enabled": False}
+    assert tenant.put(f"/api/v1/monitoring/checks/{c1['id']}", json=body).status_code == 200
+    inc = tenant.get(f"/api/v1/monitoring/checks/{c1['id']}/stats").json()["incidents"][0]
+    assert inc["ended_at"] and "check disabled" in inc["reason"]
+    tenant.post(f"/api/v1/monitoring/agents/{a['id']}/revoke")
+    assert tenant.get("/api/v1/monitoring/overview").json()["open_incidents"] == 0
+    # Checks of a revoked agent can still be edited, but no new ones added
+    assert tenant.put(f"/api/v1/monitoring/checks/{c2['id']}",
+                      json={**body, "name": "Switch", "host": "192.168.1.2"}).status_code == 200
+    assert tenant.post("/api/v1/monitoring/checks", json={**body, "name": "New"}).status_code == 422

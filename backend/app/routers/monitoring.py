@@ -28,6 +28,7 @@ class AgentIn(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     customer_id: int | None = None
     site_note: str | None = Field(default=None, max_length=200)
+    collect_endpoint: bool = False
 
 
 class AgentOut(BaseModel):
@@ -44,6 +45,7 @@ class AgentOut(BaseModel):
     agent_version: str | None
     hostname: str | None
     checks: int
+    collect_endpoint: bool
 
 
 class AgentCreated(AgentOut):
@@ -128,7 +130,7 @@ def _agent_out(ctx: OrgContext, a: MonitorAgent) -> AgentOut:
     return AgentOut(id=a.id, name=a.name, customer_id=a.customer_id, customer_name=cust.name if cust else None,
                     site_note=a.site_note, token_prefix=a.token_prefix, status=a.status, online=mon.agent_online(a),
                     last_seen_at=a.last_seen_at, last_ip=a.last_ip, agent_version=a.agent_version,
-                    hostname=a.hostname, checks=n)
+                    hostname=a.hostname, checks=n, collect_endpoint=a.collect_endpoint)
 
 
 def _check_out(ctx: OrgContext, c: MonitorCheck, now: datetime | None = None) -> CheckOut:
@@ -157,9 +159,20 @@ def asset_monitor_status(ctx: OrgContext, asset_id: int) -> str | None:
                key=lambda s: mon.SEVERITY[s])
 
 
-def _validate_check(ctx: OrgContext, body: CheckIn, exclude_id: int | None = None) -> str:
+def _close_incidents(ctx: OrgContext, check_ids: list[int], why: str) -> None:
+    """End open outages when monitoring stops, so downtime does not keep growing for a check nobody runs."""
+    if not check_ids:
+        return
+    for inc in ctx.db.scalars(select(MonitorIncident).where(MonitorIncident.check_id.in_(check_ids),
+                                                            MonitorIncident.ended_at.is_(None))):
+        inc.ended_at, inc.reason = utcnow(), f"{inc.reason or ''} ({why})".strip()
+
+
+def _validate_check(ctx: OrgContext, body: CheckIn, exclude_id: int | None = None,
+                    current_agent_id: int | None = None) -> str:
     agent = get_owned(ctx, MonitorAgent, body.agent_id, "Agent", status_code=422)
-    if agent.status != "active":
+    # A revoked agent gets no new checks, but its existing checks can still be edited (e.g. disabled).
+    if agent.status != "active" and agent.id != current_agent_id:
         raise HTTPException(422, "The agent's token is revoked")
     host = body.host
     if body.asset_id is not None:
@@ -231,6 +244,8 @@ def revoke_agent(agent_id: int, ctx: OrgContext = Depends(require("monitoring.ma
     if a.status == "revoked":
         raise HTTPException(409, "Already revoked")
     a.status, a.revoked_at = "revoked", utcnow()
+    _close_incidents(ctx, list(ctx.db.scalars(select(MonitorCheck.id).where(MonitorCheck.agent_id == a.id))),
+                     "agent revoked")
     ctx.audit("revoke", "monitor_agent", a.id, {"token_prefix": a.token_prefix})
     ctx.db.commit()
     return _agent_out(ctx, a)
@@ -271,7 +286,7 @@ def get_check(check_id: int, ctx: OrgContext = Depends(require("monitoring.view"
 @router.put("/monitoring/checks/{check_id}", response_model=CheckOut)
 def update_check(check_id: int, body: CheckIn, ctx: OrgContext = Depends(require("monitoring.manage"))):
     c = get_owned(ctx, MonitorCheck, check_id, "Check")
-    host = _validate_check(ctx, body, exclude_id=c.id)
+    host = _validate_check(ctx, body, exclude_id=c.id, current_agent_id=c.agent_id)
     new = {**body.model_dump(), "host": host}
     target_changed = any(getattr(c, k) != new[k] for k in ("agent_id", "kind", "host", "port"))
     for k, v in new.items():
@@ -279,9 +294,9 @@ def update_check(check_id: int, body: CheckIn, ctx: OrgContext = Depends(require
     if target_changed:  # old state described another target
         c.status, c.status_since, c.consecutive_failures, c.failing_since = "unknown", None, 0, None
         c.last_checked_at = c.last_latency_ms = c.last_error = None
-        for inc in ctx.db.scalars(select(MonitorIncident).where(MonitorIncident.check_id == c.id,
-                                                                MonitorIncident.ended_at.is_(None))):
-            inc.ended_at, inc.reason = utcnow(), (inc.reason or "") + " (check target changed)"
+        _close_incidents(ctx, [c.id], "check target changed")
+    elif not c.enabled:
+        _close_incidents(ctx, [c.id], "check disabled")
     ctx.audit("update", "monitor_check", c.id, {"target_changed": target_changed})
     ctx.db.commit()
     return _check_out(ctx, c)
@@ -352,6 +367,7 @@ def agent_config(agent: MonitorAgent = Depends(current_agent), db: Session = Dep
                                                    MonitorCheck.enabled.is_(True)).order_by(MonitorCheck.id)).all()
     db.commit()
     return {"agent_id": agent.id, "server_time": utcnow().isoformat(), "config_refresh_seconds": 300,
+            "collect_endpoint": agent.collect_endpoint, "endpoint_report_seconds": 900,
             "checks": [{"id": c.id, "kind": c.kind, "host": c.host, "port": c.port,
                         "interval_seconds": c.interval_seconds, "timeout_ms": c.timeout_ms} for c in checks]}
 

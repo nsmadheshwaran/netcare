@@ -78,6 +78,13 @@ document never changes if a product price or tax rate changes later.
 | monitor_incidents | Outages: started at the first failure, ended at the next success |
 | assets.mac_address, firmware, recorder_id, channel, resolution, hdd_capacity_gb, retention_days | Device and CCTV details; `(recorder_id, channel)` unique |
 
+### Migration `0007` (Phase 7)
+| Table / column | Purpose |
+|---|---|
+| monitor_agents.collect_endpoint | Opt-in: this agent also reports its PC's Defender status |
+| endpoints | One PC per (agent, hostname): OS, last report, Defender switches, mode, versions, definition and scan times, optional link to a computer asset |
+| endpoint_threats | Defender detections, unique per (endpoint, DetectionID): name, severity, category, status, file paths, review (acknowledged by/at/note) |
+
 The file bytes are not in the database; they are in `NETCARE_STORAGE_DIR`. Back up both.
 
 Every business table has an `organization_id` column with `ON DELETE CASCADE` to its organization.

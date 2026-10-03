@@ -15,6 +15,18 @@ standard library. It runs on a computer at a customer's site and reports ping an
 
 SNMP metrics are **not** implemented yet.
 
+## Endpoint security (optional, Windows)
+Switch on **Report this PC's Microsoft Defender status** when adding or editing the agent. Every 15 minutes
+the agent then runs one fixed PowerShell query (`DEFENDER_PS` in the agent, read it before installing):
+`Get-MpComputerStatus`, `Get-MpThreat`, `Get-MpThreatDetection` and the Windows version. These are read-only
+cmdlets. The agent never calls `Set-MpPreference`, `Start-MpScan`, `Remove-MpThreat` or anything that changes
+the PC. Nothing from the server is inserted into the query.
+
+It reports: protection switches, running mode, definition and engine versions and age, last scan times, and
+Defender detections of the last 30 days, including the file paths Defender lists for each detection (needed
+to find and clean the file). It does not read the files themselves. The status covers only the PC the agent
+runs on: install an agent on each PC you want to see. A PC with network checks switched off is fine.
+
 ## Install (Windows)
 1. In NetCare: **Network monitoring → Add agent**. Copy the `agent.json` shown (the token is shown once).
 2. On an always-on PC at the site, install Python 3.10+ from python.org (tick "Add to PATH").

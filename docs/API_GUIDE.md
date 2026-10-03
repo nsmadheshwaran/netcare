@@ -78,7 +78,9 @@ X-Organization-ID: <organization_id from /auth/me>
 | POST /monitoring/agents/{id}/rotate-token, POST .../revoke | monitoring.manage (token returned once) |
 | GET/POST /monitoring/checks, GET/PUT/DELETE /monitoring/checks/{id} | monitoring.view, monitoring.manage |
 | GET /monitoring/checks/{id}/stats?range=24h,7d,30d, GET /monitoring/overview, GET /monitoring/assets/{id}/checks | monitoring.view |
-| GET /agent/config, POST /agent/results | agent token (`Authorization: Bearer nca_...`) |
+| GET /agent/config, POST /agent/results, POST /agent/endpoint | agent token (`Authorization: Bearer nca_...`); endpoint needs `collect_endpoint` on the agent |
+| GET /endpoints?rating=, GET /endpoints/summary, GET /endpoints/{id} | security.view |
+| PUT /endpoints/{id}/asset, POST /endpoints/{id}/threats/{tid}/acknowledge {note} | security.manage |
 | GET /dashboard/summary?period=day,week,month,quarter,year&location_id= | dashboard.view |
 | GET /audit-logs | audit.view |
 | GET /health, GET /ready | public |
