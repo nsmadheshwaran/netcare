@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.8.0 (2026-10-03): Phase 8, data organizer
+### Added
+- `organizer/netcare_organizer.py`: local command-line tool (standard library only, no network code).
+  `plan` finds duplicates (size, then partial and full SHA-256) and optionally sorts loose files into
+  Type\YYYY-MM; `preview` writes an HTML page; `apply` is a dry run until actions are approved; every move is
+  journaled before and after; `rollback` undoes newest first; `verify-backup` compares by SHA-256 and says
+  "verified" only when every file matches. Never deletes, never overwrites, refuses system folders and whole
+  drives, skips locked or changed files.
+- Data Organizer page with the safety rules and commands.
+- Test count: 112 backend tests (was 101).
+
 ## 0.7.0 (2026-10-03): Phase 7, endpoint security visibility
 ### Added
 - Agents can report their PC's Microsoft Defender status (opt-in per agent, Windows, read-only `Get-Mp*`

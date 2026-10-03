@@ -31,7 +31,7 @@ const NAV: Item[] = [
   { label: "Network Monitoring", to: "/monitoring", icon: Activity, perm: "monitoring.view" },
   { label: "CCTV Management", to: "/cctv", icon: Camera, perm: "assets.view" },
   { label: "Endpoint Security", to: "/security", icon: ShieldCheck, perm: "security.view" },
-  { label: "Data Organizer", icon: FolderSearch },
+  { label: "Data Organizer", to: "/organizer", icon: FolderSearch },
   { label: "Alerts", icon: Bell },
   { label: "Analytics", to: "/analytics", icon: TrendingUp, perm: "analytics.view" },
   { label: "Reports", to: "/reports", icon: BarChart3, perm: "reports.view" },

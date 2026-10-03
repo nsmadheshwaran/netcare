@@ -60,6 +60,22 @@ Each form was type-checked, and the same API calls they make were exercised.
   customer, paying another tenant's invoice; inventory managers cannot approve POs; accountants are
   read-only on sales; technicians see no sales or payments.
 
+## Results at Phase 8 (2026-10-03)
+| Suite | Result |
+|---|---|
+| Backend pytest | **112 passed** (11 new organizer tests) |
+| pyflakes (app, tests, agent, organizer), `tsc`, vitest, Vite build | clean |
+| Live run | Real CLI on a scratch folder: plan (1 duplicate, 3 to organise), HTML preview, dry run, approve all (4 moved, duplicate in `_NetCare_Duplicates`), rollback restored all 4 and removed the created folders; `verify-backup` reported verified |
+| Bug found in the live run | `apply` without `--approve` reported "0 would move" instead of previewing the plan (fixed) |
+
+Phase 8 test coverage: planning changes nothing; excluded folders, lock files and empty files; duplicate keep
+rule; organise only loose top-level files; refusal of system folders, whole drives and missing folders; dry
+run, selective approval (by number and by plan flag), apply twice; nothing deleted (every byte still present);
+rollback restores the exact tree and removes created folders, and is idempotent; changed, missing and locked
+files skipped without stopping; destination collision gets a new name; rollback refuses to overwrite a reused
+location; crash between move and journal entry with a torn line; backup verification (identical, edited,
+missing, empty source); CLI and HTML preview; no network imports.
+
 ## Results at Phase 7 (2026-10-03)
 | Suite | Result |
 |---|---|

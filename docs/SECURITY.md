@@ -41,6 +41,8 @@
   from the server) using only `Get-*` Defender cmdlets; NetCare cannot change Defender, scan or delete. Reports
   are accepted only from agents with endpoint reporting switched on. Detection file paths can contain Windows
   user names, so the pages need `security.view` (owner, manager, technician).
+- **Data organizer:** a local tool with no network code; it never deletes, refuses system folders and whole
+  drives, does not follow links, journals every move before and after, and never overwrites a file.
 - **PDFs:** user-entered text is XML-escaped before ReportLab renders it, so names like `A & B <Traders>`
   cannot break or inject markup.
 - **Reports:** limited to a three-year span per request to bound load; every report run is audited.

@@ -25,6 +25,7 @@ import Analytics from "./pages/Analytics";
 import Monitoring from "./pages/Monitoring";
 import Cctv from "./pages/Cctv";
 import Security from "./pages/Security";
+import Organizer from "./pages/Organizer";
 
 if (localStorage.getItem("netcare.theme") === "dark") document.documentElement.classList.add("dark");
 
@@ -59,6 +60,7 @@ createRoot(document.getElementById("root")!).render(
             <Route path="monitoring" element={<Monitoring />} />
             <Route path="cctv" element={<Cctv />} />
             <Route path="security" element={<Security />} />
+            <Route path="organizer" element={<Organizer />} />
             <Route path="service" element={<Service />} />
             <Route path="assets" element={<Assets />} />
             <Route path="employees" element={<Employees />} />

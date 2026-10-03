@@ -169,6 +169,12 @@ Click a PC for the details and the steps to take. Fix problems on the PC itself 
 and threat protection). NetCare only shows status; it cannot change settings or remove threats. After a
 threat is removed, **Mark reviewed** with a note of what you checked.
 
+## Data organizer
+Tidies shared folders and finds duplicate files on a PC, locally. Open **Data Organizer** for the commands.
+It makes a plan first, shows it to you, changes nothing until you approve, never deletes (duplicates go to a
+`_NetCare_Duplicates` folder for you to check), and can undo everything. It can also check that a backup
+folder really matches the original. Details: [DATA_ORGANIZER](DATA_ORGANIZER.md).
+
 ## Service jobs
 1. **New ticket.** Pick the customer and the type (repair, installation, maintenance or complaint). Choose
    their registered equipment or describe a walk-in item, note what came with it (charger, bag), and assign a
