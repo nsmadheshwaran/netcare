@@ -4,3 +4,4 @@ __pycache__
 tests
 DEV_SEED.md
 .env
+storage/

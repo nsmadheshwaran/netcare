@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { AlertTriangle, Download, FileSpreadsheet, FileText } from "lucide-react";
+import { AlertTriangle, Archive, Download, FileSpreadsheet, FileText } from "lucide-react";
 import { api, download, inr, qty } from "../api";
 import { useLocations } from "../components/trade";
-import { ErrorBanner, Field, PageHeader, Spinner, useAsync } from "../components/ui";
+import { ErrorBanner, Field, Modal, PageHeader, Spinner, useAsync } from "../components/ui";
 
 type Col = { key: string; label: string; kind: string };
 type ReportJson = { title: string; subtitle: string; draft: boolean; notes: string[]; columns: Col[]; rows: any[]; totals: any | null; sections: ReportJson[] };
@@ -19,7 +19,36 @@ const DESCRIPTIONS: Record<string, string> = {
   "payables-ageing": "Who you owe, by how overdue",
   "gst-summary": "Draft tax summary for your accountant. Not a return",
   "stock-valuation": "Quantity on hand at moving-average cost",
+  "service-performance": "Jobs opened and completed, turnaround, by technician",
+  "warranty-expiry": "Customer equipment whose warranty is ending",
+  "maintenance-due": "Maintenance visits overdue or due soon",
+  "task-completion": "Tasks completed, late and open, per employee",
+  "attendance": "Days present, absent and on leave, per employee",
+  "documents-expiring": "Contracts, warranty cards and licences expiring within 60 days",
 };
+
+function PackForm({ onDone }: { onDone: () => void }) {
+  const [f, setF] = useState({ date_from: firstOfMonth(), date_to: todayLocal(), format: "xlsx" });
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const go = () => {
+    setBusy(true);
+    download(`/reports/pack?date_from=${f.date_from}&date_to=${f.date_to}&format=${f.format}`, `reports_${f.date_from}_${f.date_to}.zip`)
+      .then(onDone).catch((e) => setErr(e.message)).finally(() => setBusy(false));
+  };
+  return (
+    <div className="space-y-3">
+      <ErrorBanner message={err} />
+      <p className="text-sm text-slate-500">Every report you can see, for one period, in a single ZIP file: useful for the month-end handover to your accountant. Dues, warranty and document reports are taken as of the last day.</p>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Field label="From"><input className="input" type="date" value={f.date_from} onChange={(e) => setF({ ...f, date_from: e.target.value })} /></Field>
+        <Field label="To"><input className="input" type="date" value={f.date_to} onChange={(e) => setF({ ...f, date_to: e.target.value })} /></Field>
+        <Field label="Format"><select className="input" value={f.format} onChange={(e) => setF({ ...f, format: e.target.value })}><option value="xlsx">Excel</option><option value="pdf">PDF</option><option value="csv">CSV</option></select></Field>
+      </div>
+      <div className="flex justify-end gap-2"><button className="btn-ghost" onClick={onDone}>Cancel</button><button className="btn-primary" disabled={busy} onClick={go}><Archive size={15} /> {busy ? "Preparing…" : "Download ZIP"}</button></div>
+    </div>
+  );
+}
 
 const fmtCell = (v: any, kind: string) =>
   v === null || v === undefined || v === "" ? "" : kind === "money" ? inr(v) : kind === "qty" ? qty(v) : String(v);
@@ -68,6 +97,7 @@ export default function Reports() {
   const [key, setKey] = useState("profit-loss");
   const [p, setP] = useState({ date_from: firstOfMonth(), date_to: todayLocal(), day: todayLocal(), as_of: todayLocal(), location_id: "" });
   const [err, setErr] = useState<string | null>(null);
+  const [pack, setPack] = useState(false);
   const item = catalog.data?.find((c) => c.key === key);
   const query = () => {
     if (!item) return "";
@@ -80,7 +110,9 @@ export default function Reports() {
 
   return (
     <>
-      <PageHeader title="Reports" subtitle="Generated from your saved records. Export for your accountant." />
+      <PageHeader title="Reports" subtitle="Generated from your saved records. Export for your accountant."
+        actions={<button className="btn-ghost" onClick={() => setPack(true)}><Archive size={15} /> Export all reports</button>} />
+      {pack && <Modal title="Export all reports" onClose={() => setPack(false)}><PackForm onDone={() => setPack(false)} /></Modal>}
       <ErrorBanner message={catalog.error || err} />
       <div className="grid gap-4 lg:grid-cols-[260px_1fr]">
         <div className="card !p-2">

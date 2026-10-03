@@ -64,6 +64,13 @@ document never changes if a product price or tax rate changes later.
 | maintenance_schedules | Interval in months, next due, last done |
 | sales_invoice_lines.ticket_part_id | Marks lines whose stock already left on a ticket |
 
+### Migration `0005` (Phase 5)
+| Table / column | Purpose |
+|---|---|
+| stored_documents | Metadata of an uploaded file: attached record (`entity_type`, `entity_id`, checked against the business in code, not by FK), title, category, tags, expiry, sensitive flag, detected type, size, SHA-256, random `storage_key`; soft delete (`deleted_*`) and `purged_at` tombstone |
+
+The file bytes are not in the database; they are in `NETCARE_STORAGE_DIR`. Back up both.
+
 Every business table has an `organization_id` column with `ON DELETE CASCADE` to its organization.
 
 ## Migrations

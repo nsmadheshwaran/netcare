@@ -49,8 +49,14 @@ Note: `limit_req_zone` belongs in the `http {}` block.
 scripts/backup.sh
 scripts/restore.sh backups/netcare-20261002-210000.sql.gz
 ```
-`backup.sh` writes a gzipped `pg_dump` to `backups/`. `restore.sh` asks you to confirm, then overwrites the
-database.
+`backup.sh` writes a gzipped `pg_dump` and a `-files.tar.gz` archive of uploaded documents (the `docstore`
+volume) to `backups/`. `restore.sh` asks you to confirm, then overwrites the database and, if the matching
+files archive is next to the dump, the documents. Keep the two files of one backup together: a database
+restored without its documents archive has records whose downloads answer "file missing" (HTTP 410).
+
+Upload limits: `NETCARE_MAX_UPLOAD_MB` (default 15) and `NETCARE_ORG_STORAGE_QUOTA_MB` (default 2048). If you
+raise the upload limit above 15 MB, also raise `client_max_body_size` in `frontend/nginx.conf` and in your
+HTTPS proxy.
 
 - Schedule `backup.sh` daily with cron and copy `backups/` off the server.
 - **A backup is not proven until it has been restored.** Test-restore to a staging server every month.

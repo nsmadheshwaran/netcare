@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Archive, Download, Pencil, Plus, RotateCcw, Upload, Wallet } from "lucide-react";
 import { api, download, inr, type Page } from "../api";
 import { useAuth } from "../auth";
+import { AttachedDocuments } from "./Documents";
 import { Badge, confirmAction, Empty, ErrorBanner, Field, Modal, PageHeader, Pager, Spinner, useAsync } from "../components/ui";
 
 type Customer = {
@@ -167,6 +168,7 @@ function Account({ c }: { c: Customer }) {
           <tr key={p.id} className={`border-t border-slate-100 dark:border-slate-800 ${p.voided_at ? "opacity-50" : ""}`}><td className="td font-mono text-xs">{p.number}</td><td className="td">{p.payment_date}</td><td className="td">{p.method}{p.voided_at ? " (void)" : ""}</td><td className="td text-right">{inr(p.amount)}</td></tr>))}</tbody></table>}
       </div>
       {!!data.quotations.length && <div><h3 className="mb-1 font-medium">Quotations</h3>{data.quotations.map((q: any) => <div key={q.id} className="text-sm">{q.number} · {q.quote_date} · {q.status} · {inr(q.total)}</div>)}</div>}
+      <AttachedDocuments entityType="customer" entityId={c.id} />
     </div>
   );
 }

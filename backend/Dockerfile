@@ -4,7 +4,8 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
-RUN useradd --create-home netcare && chown -R netcare /app
+# /app/storage exists in the image so the mounted volume inherits netcare ownership.
+RUN useradd --create-home netcare && mkdir -p /app/storage && chown -R netcare /app
 USER netcare
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s CMD python -c "import urllib.request;urllib.request.urlopen('http://localhost:8000/ready')"

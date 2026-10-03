@@ -570,6 +570,31 @@ def attendance_summary(ctx: OrgContext, d0: date, d1: date) -> Report:
                   notes=["For record-keeping only. NetCare does not calculate salaries or statutory dues."])
 
 
+def documents_expiring(ctx: OrgContext, as_of: date) -> Report:
+    from ..models_docs import StoredDocument
+    from ..routers.library import ENTITIES, visible_query  # local import: the router imports this module's peers
+    docs = ctx.db.scalars(visible_query(ctx).where(
+        StoredDocument.deleted_at.is_(None), StoredDocument.expires_on.is_not(None),
+        StoredDocument.expires_on <= as_of + timedelta(days=60)).order_by(StoredDocument.expires_on)).all()
+    rows = []
+    for d in docs:
+        label = "General"
+        if d.entity_type in ENTITIES:
+            model, _, fn = ENTITIES[d.entity_type]
+            obj = ctx.db.get(model, d.entity_id)
+            label = f"{d.entity_type.replace('_', ' ').capitalize()}: {fn(obj) if obj else '?'}"
+        rows.append({"title": d.title, "category": d.category.replace("_", " "), "attached_to": label,
+                     "expires_on": d.expires_on, "days": (d.expires_on - as_of).days})
+    return Report("Documents expiring", [
+        Column("title", "Document"), Column("category", "Category"), Column("attached_to", "Attached to"),
+        Column("expires_on", "Expires on", "date"), Column("days", "Days", "int")], rows,
+        f"Expired or expiring within 60 days of {as_of:%d %b %Y}",
+        notes=["Negative days means already expired. Only documents you are allowed to see are listed."])
+
+
+# Reports that need a permission beyond reports.view.
+REPORT_PERMS = {"documents-expiring": "documents.view"}
+
 CATALOG = {
     "sales-register": ("Sales register", "period", sales_register),
     "purchase-register": ("Purchase register", "period", purchase_register),
@@ -586,4 +611,5 @@ CATALOG = {
     "maintenance-due": ("Maintenance due", "as_of", maintenance_due),
     "task-completion": ("Task completion", "period", task_completion),
     "attendance": ("Attendance summary", "period", attendance_summary),
+    "documents-expiring": ("Documents expiring", "as_of", documents_expiring),
 }

@@ -60,6 +60,22 @@ Each form was type-checked, and the same API calls they make were exercised.
   customer, paying another tenant's invoice; inventory managers cannot approve POs; accountants are
   read-only on sales; technicians see no sales or payments.
 
+## Results at Phase 5 (2026-10-03)
+| Suite | Result |
+|---|---|
+| Backend pytest | **80 passed** (10 new document, analytics and report pack tests) |
+| `alembic check`, upgrade/downgrade/upgrade | passed through `0005` |
+| pyflakes, `tsc`, vitest, Vite build | clean, clean, 3 passed, built |
+| Mutation check | Removing the record-permission filter on documents made a test fail; reverted |
+| Live run | Uploaded a contract with an expiry date through the UI; it listed with an "expires in 12d" badge; Analytics rendered from the dev data; the report pack downloaded as a 75 KB ZIP |
+
+Phase 5 test coverage: type detection from bytes (renamed PNG, binary, empty, non-UTF-8 text, plain ZIP,
+macro DOCX, ZIP bomb); path tricks in file names; size limit and quota; duplicate on the same record (no orphan
+file left); download headers; cross-tenant isolation; record-level visibility (salesperson vs employee
+documents); sensitive documents hidden from accountants; technician uploads only to own tickets; delete with
+reason, restore, owner-only purge removing the file; expiry filter and report; report permission; report pack
+contents; analytics KPIs, gross profit with a service line, granularity and validation.
+
 ## Results at Phase 4 (2026-10-03)
 | Suite | Result |
 |---|---|

@@ -16,6 +16,10 @@ class Settings(BaseSettings):
     login_window_seconds: int = 300
     # Business-local time for "today" and report dates. India has no DST, so a fixed offset is exact.
     utc_offset_minutes: int = 330
+    # Uploaded documents live on disk here, outside the web root. Back this directory up with the database.
+    storage_dir: str = "./storage"
+    max_upload_mb: int = 15
+    org_storage_quota_mb: int = 2048
 
     @property
     def cors_origin_list(self) -> list[str]:

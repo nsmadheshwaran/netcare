@@ -67,6 +67,13 @@ X-Organization-ID: <organization_id from /auth/me>
 | GET/PUT /attendance | employees.view, attendance.manage |
 | GET/POST /leave-requests, POST .../decide, POST .../cancel | tasks.view (own), attendance.manage |
 | GET/POST /tasks, PUT /tasks/{id}, POST /tasks/{id}/status | tasks.view, tasks.edit (assignees may move their own) |
+| GET /documents/meta (categories, limits, storage used) | documents.view |
+| GET /documents?q=&entity_type=&entity_id=&category=&expiring_days=&deleted= | documents.view (+ record view permission; `deleted` needs documents.sensitive) |
+| POST /documents (multipart: file, entity_type, entity_id, title, category, tags, notes, expires_on, is_sensitive) | documents.edit (+ record view permission) |
+| GET/PATCH /documents/{id}, GET /documents/{id}/download?inline= | documents.view, documents.edit |
+| POST /documents/{id}/delete {reason}, POST .../restore, POST .../purge | documents.edit, documents.sensitive, documents.purge |
+| GET /analytics/overview?date_from=&date_to= | analytics.view |
+| GET /reports/pack?date_from=&date_to=&format=xlsx,pdf,csv&keys= | reports.view |
 | GET /dashboard/summary?period=day,week,month,quarter,year&location_id= | dashboard.view |
 | GET /audit-logs | audit.view |
 | GET /health, GET /ready | public |
@@ -120,6 +127,18 @@ Document rules:
 - `stock-valuation` takes an optional `location_id`.
 
 Add `format=pdf`, `xlsx` or `csv` to download. Every report run is written to the audit log.
+
+`GET /reports/pack` returns a ZIP of every report for one period (or only `keys=a,b`). Period reports cover the
+period; as-of reports use `date_to`; the daily closing is left out.
+
+## Documents
+```bash
+curl -H "Authorization: Bearer $T" -H "X-Organization-ID: 1" -F file=@warranty.pdf \
+     -F entity_type=customer -F entity_id=12 -F category=warranty -F expires_on=2027-03-31 \
+     http://localhost:8000/api/v1/documents
+```
+Errors: 413 too large, 422 type not accepted or bad target, 409 same file already attached, 507 quota full,
+410 file missing on disk (restore from backup).
 
 ## Example: receive stock
 ```bash

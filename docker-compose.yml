@@ -20,6 +20,9 @@ services:
     env_file: .env
     environment:
       NETCARE_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      NETCARE_STORAGE_DIR: /app/storage
+    # Uploaded documents. Back this up together with the database (scripts/backup.sh does both).
+    volumes: [docstore:/app/storage]
     depends_on:
       db: { condition: service_healthy }
 
@@ -31,3 +34,4 @@ services:
 
 volumes:
   pgdata:
+  docstore:

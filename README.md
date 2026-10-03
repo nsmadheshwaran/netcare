@@ -5,10 +5,10 @@
 A multi-tenant business management platform for Indian small businesses: computer shops, CCTV installers,
 IT service providers, electronics retailers, schools and SMBs.
 
-> **Status: Phase 4 (service and employees) complete.** Business management, finance and reports, plus service
-> and repair tickets, technicians, customer equipment, maintenance schedules, employees, attendance, leave and
-> tasks work end to end. Document storage, network/CCTV monitoring, endpoint security and the data organizer
-> are **not built yet**. They show as "Planned" in
+> **Status: Phase 5 (documents and analytics) complete.** Business management, finance and reports, service
+> and repair tickets, technicians, customer equipment, maintenance schedules, employees, attendance, leave,
+> tasks, a secure document library and analytics work end to end. Network/CCTV monitoring, endpoint security,
+> the data organizer and notifications are **not built yet**. They show as "Planned" in
 > the UI and appear on the dashboard as "Not yet available", with no placeholder numbers.
 
 ## What works today
@@ -36,6 +36,9 @@ IT service providers, electronics retailers, schools and SMBs.
 | Customer equipment | Cameras, DVR/NVRs, computers, network gear per customer site with serial, IP, location, warranty status, service history and replacement records; installations register equipment in one step |
 | Maintenance | Recurring schedules (AMC visits) that create visit tickets and roll forward when the job is completed |
 | People | Employees (optionally linked to a login), daily attendance, leave requests and approval (approved leave fills attendance), tasks with owners and due dates. No payroll |
+| Documents | Upload PDF, images, Word/Excel (no macros), text and CSV (type checked from the bytes, 15 MB, per-business quota); attach to customers, suppliers, products, invoices, bills, orders, expenses, service jobs, equipment or employees; expiry dates and an expiry report; sensitive documents for owners/managers; soft delete, restore, owner-only purge; every download audited |
+| Analytics | Sales, gross profit, collections, expenses, invoices, new customers and service jobs against the previous period; trend charts; top products, customers, categories and payment methods |
+| Report pack | Every report for a period in one ZIP (Excel, PDF or CSV) for the accountant |
 | Numbering | Gap-free, per organization and financial year (e.g. `INV/2026-27/00001`), configurable prefixes, row-locked |
 | Dashboard | Period (day/week/month/quarter/FY) and location filters; invoiced, received, receivables (and overdue), payables, sales vs purchases chart; customer counts, stock valuation at cost, low/out-of-stock, activity chart, recent activity, all from the database |
 | Audit | Every create/update/archive/stock change/import/export is logged with the user and IP address |
@@ -81,7 +84,8 @@ Local dev uses SQLite by default (`netcare_dev.db`). For PostgreSQL, set
 - [x] **Phase 4, service and employees:** tickets, technicians, approvals, parts, ticket billing, assets and warranty, maintenance schedules, employees, attendance, leave, tasks, 5 new reports
 - [ ] Phase 4 follow-ups: SMS/WhatsApp job updates to customers (needs a provider), customer signature capture on a tablet, technician mobile layout polish
 - [ ] Phase 3 follow-ups: emailing invoices (needs an email provider), bank statement reconciliation, credit note PDF, GSTR-format exports (only after accountant validation)
-- [ ] **Phase 5:** documents (secure upload), analytics, report exports
+- [x] **Phase 5, documents and analytics:** secure document library attached to records, expiry tracking, analytics with period comparison, all-reports ZIP export
+- [ ] Phase 5 follow-ups: antivirus scanning of uploads, image thumbnails, document versioning, scheduled emailing of report packs (needs an email provider)
 - [ ] **Phase 6:** device inventory, monitoring agent, uptime/latency, CCTV assets
 - [ ] **Phase 7:** endpoint security visibility (Defender status/events)
 - [ ] **Phase 8:** local data organizer (dry run, approval, rollback)

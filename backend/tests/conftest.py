@@ -7,6 +7,7 @@ from alembic.config import Config
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import sessionmaker
 
+from app.config import get_settings
 from app.db import get_db, make_engine
 from app.main import app
 from app.security import login_limiter
@@ -21,6 +22,14 @@ def migrated_template(tmp_path_factory):
     cfg = Config("alembic.ini")
     cfg.attributes["database_url"] = f"sqlite:///{path}"
     command.upgrade(cfg, "head")
+    return path
+
+
+@pytest.fixture(autouse=True)
+def storage_dir(tmp_path, monkeypatch):
+    """Uploaded documents go to a per-test directory."""
+    path = tmp_path / "storage"
+    monkeypatch.setattr(get_settings(), "storage_dir", str(path))
     return path
 
 
@@ -67,6 +76,10 @@ class Tenant:
 
     def patch(self, url, **kw):
         return self.client.patch(url, headers=self.h, **kw)
+
+    def upload(self, content: bytes, name="file.pdf", **form):
+        return self.client.post("/api/v1/documents", headers=self.h, files={"file": (name, content)},
+                                data={k: str(v) for k, v in form.items()})
 
 
 def register(client, org="Acme Computers") -> Tenant:

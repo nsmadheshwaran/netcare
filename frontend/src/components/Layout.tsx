@@ -3,7 +3,7 @@ import { NavLink, Outlet } from "react-router-dom";
 import {
   Activity, BarChart3, Bell, Boxes, Building2, Camera, ClipboardList, Cpu, FileText, FolderSearch, LayoutDashboard,
   LogOut, Menu, Moon, Package, Receipt, ScrollText, Settings, ShieldCheck, ShoppingCart, Sun, Truck, UserCog, Users,
-  Wallet, Wrench, Briefcase, UserCheck, CreditCard, FileSignature, type LucideIcon,
+  Wallet, Wrench, Briefcase, TrendingUp, UserCheck, CreditCard, FileSignature, type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "../auth";
 
@@ -26,13 +26,14 @@ const NAV: Item[] = [
   { label: "Employees", to: "/employees", icon: Briefcase, perm: "tasks.view" },
   { label: "Tasks", to: "/tasks", icon: ClipboardList, perm: "tasks.view" },
   { label: "Service Management", to: "/service", icon: Wrench, perm: "service.view" },
-  { label: "Documents", icon: FileText },
+  { label: "Documents", to: "/documents", icon: FileText, perm: "documents.view" },
   { label: "IT Assets", to: "/assets", icon: Cpu, perm: "assets.view" },
   { label: "Network Monitoring", icon: Activity },
   { label: "CCTV Management", icon: Camera },
   { label: "Endpoint Security", icon: ShieldCheck },
   { label: "Data Organizer", icon: FolderSearch },
   { label: "Alerts", icon: Bell },
+  { label: "Analytics", to: "/analytics", icon: TrendingUp, perm: "analytics.view" },
   { label: "Reports", to: "/reports", icon: BarChart3, perm: "reports.view" },
   { label: "Users and Roles", to: "/users", icon: UserCog, perm: "users.manage" },
   { label: "Audit Logs", to: "/audit", icon: ScrollText, perm: "audit.view" },

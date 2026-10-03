@@ -3,6 +3,7 @@ import { CalendarClock, CheckCircle2, MessageSquare, Package, Plus, Printer, Rec
 import { api, inr, openPdf, qty, type Page } from "../api";
 import { useAuth } from "../auth";
 import { PartySelect, today, useCustomers, useLocations, useProducts } from "../components/trade";
+import { AttachedDocuments } from "./Documents";
 import { Badge, confirmAction, Empty, ErrorBanner, Field, Modal, PageHeader, Pager, Spinner, useAsync } from "../components/ui";
 
 export type Ticket = {
@@ -250,6 +251,8 @@ export function TicketDetail({ id, onChanged }: { id: number; onChanged?: () => 
 
       {office && can("assets.edit") && t.ticket_type === "installation" && t.status !== "cancelled" &&
         <button className="btn-ghost" onClick={() => setMode("assets")}><Wrench size={15} /> Register installed equipment</button>}
+
+      <AttachedDocuments entityType="service_ticket" entityId={t.id} />
 
       <div>
         <h3 className="mb-2 flex items-center gap-2 font-medium"><MessageSquare size={16} /> Timeline</h3>

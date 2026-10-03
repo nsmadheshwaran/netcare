@@ -22,6 +22,14 @@
 - **Uploads (logo):** limited to 300 KB and 4000 × 4000 pixels. The type is detected from the file's bytes
   (PNG/JPEG signatures), never from its name or declared type, and the image must decode. Logos are stored in
   the database and served only to signed-in members of that business.
+- **Uploads (documents):** 15 MB per file and a per-business quota (both configurable). The type is detected
+  from the bytes and checked against an allow-list (PDF, images, DOCX/XLSX without macros, UTF-8 text/CSV);
+  executables, archives, macro-enabled Office files and ZIP bombs are refused. File names are reduced to a
+  safe base name. Files live outside the web root under random names and are served only through the API, with
+  `Content-Disposition: attachment` (inline only for PDF/images on request), `nosniff`, a sandboxing
+  `Content-Security-Policy` and `Cache-Control: no-store`. A document is visible only to members who can also
+  see the record it is attached to; sensitive documents only to owners and managers. Uploads, downloads,
+  edits, deletes, restores and purges are audited. There is **no antivirus scan**: see known limitations.
 - **PDFs:** user-entered text is XML-escaped before ReportLab renders it, so names like `A & B <Traders>`
   cannot break or inject markup.
 - **Reports:** limited to a three-year span per request to bound load; every report run is audited.
@@ -35,6 +43,10 @@
   so traffic must come through your HTTPS proxy.
 
 ## Known limitations (fix before going live)
+- **No malware scanning of uploads.** The allow-list blocks executables and macro documents, but a malicious
+  PDF or image could still target a reader's PDF/image software. Add ClamAV (or similar) before accepting
+  files from outside the business.
+- **Documents are not encrypted at rest** by NetCare. Use disk encryption on the server.
 - **Tokens live in `localStorage`.** That is simple but readable by any XSS. React escapes output and there is
   no raw HTML rendering, but before production consider httpOnly cookies with CSRF protection.
 - **No refresh tokens.** Users sign in again after the token expires.

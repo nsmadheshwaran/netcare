@@ -18,6 +18,10 @@
 | Technician, Viewer | View only |
 | Receptionist | View and edit customers; view products |
 
+Documents: every role can view documents (on records it can see), and every role except Viewer can upload.
+Sensitive documents and the deleted list: owners and managers. Purge: owners. Analytics: owners, managers and
+accountants.
+
 ## Customers
 - **Add customer:** choose Individual or Business. GSTIN and the 6-digit PIN code are checked for format.
 - If the phone, email or GSTIN matches an existing customer, NetCare warns you. Click **Save anyway** if the
@@ -114,6 +118,28 @@ Open **Reports**, pick a report and a period, and download it as PDF, Excel or C
 - **Daily closing** helps you count the cash drawer at the end of the day.
 - **Customer dues** shows who to chase.
 - **GST summary** is a **draft** for your accountant. It is not a return to file.
+
+Use **Export all reports** to download every report for a period as one ZIP file (Excel, PDF or CSV), for
+example at month end for your accountant.
+
+## Documents
+Open **Documents** to upload bills, warranty cards, contracts, photos, manuals and ID proofs (PDF, JPEG, PNG,
+WebP, Word, Excel, text or CSV, up to 15 MB). You can also attach files directly from a service job, a
+customer's account or a piece of customer equipment.
+- Set an **expiry date** on contracts, AMCs, licences and warranty cards. Filter "Expired or expiring in 30
+  days", or run the **Documents expiring** report.
+- People only see documents attached to records they are allowed to see. A salesperson cannot open an
+  employee's papers, for example.
+- Owners and managers can mark a document **sensitive** (ID proofs, contracts). Only they can see it.
+- Deleting asks for a reason. Owners and managers can see deleted documents and restore them. Only an owner
+  can **purge** a deleted document, which removes the file permanently.
+- Technicians can attach photos and reports to their own jobs.
+
+## Analytics
+**Analytics** (owners, managers and accountants) shows sales, gross profit, collections, expenses, new
+customers and service jobs for a period, each compared with the previous period of the same length, plus a
+trend chart and your top products, customers, categories and payment methods. Gross profit only counts sales
+whose cost was recorded; the page says how many lines were left out.
 
 ## Service jobs
 1. **New ticket.** Pick the customer and the type (repair, installation, maintenance or complaint). Choose

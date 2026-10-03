@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.5.0 (2026-10-03): Phase 5, documents and analytics
+### Added
+- Document library: upload PDF, images, Word/Excel (no macros), text and CSV up to 15 MB; attach to customers,
+  suppliers, products, invoices, bills, purchase orders, expenses, service tickets, equipment or employees, or
+  keep as general documents. Categories, tags, notes and expiry dates; search and filters.
+- File type detected from the bytes; files stored on disk under random names with a SHA-256 checksum; per
+  business storage quota; duplicate uploads to the same record refused.
+- Access follows the attached record (you only see documents on records you can see). Sensitive and deleted
+  documents are for owners and managers; purge (permanent removal) is owner-only. Uploads, downloads and
+  changes are audited.
+- Attachment panels on service tickets, customer accounts and customer equipment. Technicians can attach to
+  their own jobs.
+- Analytics page: sales, gross profit, collections, expenses, invoices, new customers and service jobs compared
+  with the previous period, trend charts, top products/customers/categories, collections by method.
+- "Export all reports": one ZIP with every report for a period. New "Documents expiring" report.
+- Migration `0005`. Docker Compose `docstore` volume; `backup.sh` and `restore.sh` include documents.
+  Test count: 80 backend tests (was 70).
+
+### Changed
+- nginx accepts request bodies up to 16 MB (was 5 MB) for document uploads.
+- The Vite dev proxy target can be set with `NETCARE_API_URL`.
+
 ## 0.4.0 (2026-10-03): Phase 4, service and employees
 ### Added
 - Service tickets (repair, installation, maintenance, complaint) with an enforced status workflow, priorities,

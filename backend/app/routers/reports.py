@@ -1,12 +1,15 @@
+import io
 import re
+import zipfile
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 
 from ..deps import OrgContext, require
+from ..permissions import has_permission
 from ..services import export
-from ..services.reports import CATALOG
+from ..services.reports import CATALOG, REPORT_PERMS
 from ..services.timeutil import today
 
 router = APIRouter(prefix="/reports", tags=["reports"])
@@ -16,9 +19,67 @@ MEDIA = {"csv": ("text/csv; charset=utf-8", "csv"),
          "pdf": ("application/pdf", "pdf")}
 
 
+def _allowed(ctx: OrgContext, key: str) -> bool:
+    perm = REPORT_PERMS.get(key)
+    return perm is None or has_permission(ctx.membership.role, perm)
+
+
+def _period(date_from: date | None, date_to: date | None) -> tuple[date, date]:
+    t = today()
+    d0, d1 = date_from or t.replace(day=1), date_to or t
+    if d1 < d0:
+        raise HTTPException(422, "date_to is before date_from")
+    if (d1 - d0).days > 3 * 366:
+        raise HTTPException(422, "Choose a period of at most three years")
+    return d0, d1
+
+
+def _render(report: export.Report, format: str, org_name: str) -> bytes:
+    if format == "pdf":
+        return export.to_pdf(report, org_name)
+    return {"csv": export.to_csv, "xlsx": export.to_xlsx}[format](report)
+
+
+def _filename(name: str) -> str:
+    return re.sub(r"[^A-Za-z0-9_.-]", "_", name)
+
+
 @router.get("")
 def catalog(ctx: OrgContext = Depends(require("reports.view"))):
-    return [{"key": k, "title": t, "params": p} for k, (t, p, _) in CATALOG.items()]
+    return [{"key": k, "title": t, "params": p} for k, (t, p, _) in CATALOG.items() if _allowed(ctx, k)]
+
+
+@router.get("/pack")
+def report_pack(ctx: OrgContext = Depends(require("reports.view")), date_from: date | None = None,
+                date_to: date | None = None, format: str = Query("xlsx", pattern="^(csv|xlsx|pdf)$"),
+                keys: str | None = Query(None, description="Comma-separated report keys; default all")):
+    """Every report for one period in a single ZIP, e.g. the month-end handover to the accountant.
+    Period reports cover the period; as-of and stock reports are taken at its last day; the daily closing
+    is left out (it is one day)."""
+    d0, d1 = _period(date_from, date_to)
+    wanted = [k.strip() for k in keys.split(",")] if keys else [k for k in CATALOG if k != "daily-closing"]
+    unknown = [k for k in wanted if k not in CATALOG]
+    if unknown:
+        raise HTTPException(422, f"Unknown report(s): {', '.join(unknown)}")
+    wanted = [k for k in wanted if _allowed(ctx, k)]
+    if not wanted:
+        raise HTTPException(422, "No reports selected")
+    _, ext = MEDIA[format]
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for i, key in enumerate(wanted, 1):
+            _, kind, fn = CATALOG[key]
+            report = (fn(ctx, d0, d1) if kind == "period" else fn(ctx, d1) if kind in ("day", "as_of")
+                      else fn(ctx, None))
+            z.writestr(f"{i:02d}_{key}.{ext}", _render(report, format, ctx.org.name))
+        z.writestr("README.txt", f"{ctx.org.name}: reports for {d0} to {d1}, generated {today()}.\n"
+                   "Period reports cover the whole period. Dues, warranty, maintenance and document reports are\n"
+                   "as of the last day; stock valuation is the current stock. The GST summary is a draft for\n"
+                   "your accountant, not a return.\n")
+    ctx.audit("export_pack", "report", None, {"format": format, "from": str(d0), "to": str(d1), "keys": wanted})
+    ctx.db.commit()
+    return Response(buf.getvalue(), media_type="application/zip", headers={
+        "Content-Disposition": f'attachment; filename="{_filename(f"reports_{d0}_{d1}_{format}.zip")}"'})
 
 
 @router.get("/{key}")
@@ -28,15 +89,12 @@ def run_report(key: str, ctx: OrgContext = Depends(require("reports.view")),
                format: str = Query("json", pattern="^(json|csv|xlsx|pdf)$")):
     if key not in CATALOG:
         raise HTTPException(404, "Unknown report")
+    if not _allowed(ctx, key):
+        raise HTTPException(403, f"Missing permission: {REPORT_PERMS[key]}")
     title, kind, fn = CATALOG[key]
     t = today()
     if kind == "period":
-        d0 = date_from or t.replace(day=1)
-        d1 = date_to or t
-        if d1 < d0:
-            raise HTTPException(422, "date_to is before date_from")
-        if (d1 - d0).days > 3 * 366:
-            raise HTTPException(422, "Choose a period of at most three years")
+        d0, d1 = _period(date_from, date_to)
         report = fn(ctx, d0, d1)
         suffix = f"{d0}_{d1}"
     elif kind == "day":
@@ -53,7 +111,5 @@ def run_report(key: str, ctx: OrgContext = Depends(require("reports.view")),
     if format == "json":
         return report.to_json()
     media, ext = MEDIA[format]
-    body = {"csv": export.to_csv, "xlsx": export.to_xlsx}[format](report) if format != "pdf" \
-        else export.to_pdf(report, ctx.org.name)
-    filename = re.sub(r"[^A-Za-z0-9_.-]", "_", f"{key}_{suffix}.{ext}")
-    return Response(body, media_type=media, headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+    return Response(_render(report, format, ctx.org.name), media_type=media,
+                    headers={"Content-Disposition": f'attachment; filename="{_filename(f"{key}_{suffix}.{ext}")}"'})

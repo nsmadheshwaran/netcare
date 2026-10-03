@@ -98,6 +98,26 @@ Customer site: (future) Windows agent --outbound HTTPS, per-agent revocable toke
 - **Maintenance.** Completing a ticket linked to a schedule sets `last_done` and moves `next_due` forward by
   the interval (month-end safe).
 
+## Documents, analytics and report pack (Phase 5)
+- **Storage.** `services/storage.py` writes uploads to `NETCARE_STORAGE_DIR/<org_id>/<random hex>` (write to
+  `.part`, fsync, rename). The database row (`stored_documents`) holds the metadata, size and SHA-256. Paths
+  are generated, never taken from the user, and are resolved and checked to stay inside the storage root.
+- **Type detection.** `storage.detect` reads the bytes: PDF, PNG, JPEG, WebP, DOCX/XLSX (a ZIP with
+  `[Content_Types].xml`; macros, too many entries or a high compression ratio are refused), or UTF-8 text/CSV.
+  The stored content type and extension come from detection, not the browser.
+- **Access.** `routers/library.py`: `documents.view/edit` plus view permission on the attached record
+  (`ENTITIES` maps each entity type to its permission), so listing and fetching by id respect module access.
+  `documents.sensitive` gates sensitive files and the deleted list; `documents.purge` (owner) removes files.
+  Technicians attach to service tickets through the same `_can_work` check as ticket edits.
+- **Lifecycle.** Delete is soft (reason kept, file kept, restorable). Purge removes the file *after* the commit
+  and keeps the row as a tombstone. A failed insert removes the file it just wrote. The same file on the same
+  record is a 409.
+- **Analytics.** `services/analytics.py` computes KPIs for the period and the previous period of equal length,
+  a daily (up to 62 days) or monthly trend, and top products/customers/categories/payment methods. Gross profit
+  uses the cost captured on each invoice line; uncosted product lines are counted and reported in `notes`.
+- **Report pack.** `GET /reports/pack` renders every allowed report into one ZIP. `REPORT_PERMS` adds extra
+  permissions to individual reports (the document expiry report needs `documents.view`).
+
 ## Frontend layout (`frontend/src`)
 - `api.ts`: fetch wrapper and error formatting
 - `auth.tsx`: session and permissions context

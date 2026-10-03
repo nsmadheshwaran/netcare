@@ -4,6 +4,7 @@ import { api, type Page } from "../api";
 import { useAuth } from "../auth";
 import { PartySelect, useCustomers } from "../components/trade";
 import { Badge, Empty, ErrorBanner, Field, Modal, PageHeader, Pager, Spinner, useAsync } from "../components/ui";
+import { AttachedDocuments } from "./Documents";
 import { StatusBadge, TicketDetail } from "./Service";
 
 type Asset = { id: number; customer_id: number; customer_name: string; asset_type: string; name: string; brand: string | null; model: string | null; serial_number: string | null; site_location: string | null; ip_address: string | null; installed_on: string | null; warranty_until: string | null; warranty_status: string; status: string; open_tickets: number; notes: string | null };
@@ -101,7 +102,7 @@ export default function Assets() {
         )}
       </div>
       {editing && <Modal title={editing.id ? "Edit equipment" : "Add equipment"} wide onClose={() => setEditing(null)}><AssetForm initial={editing} onDone={() => { setEditing(null); reload(); }} /></Modal>}
-      {history && <Modal title={`${history.name}: service history`} wide onClose={() => setHistory(null)}><AssetHistory asset={history} /></Modal>}
+      {history && <Modal title={`${history.name}: service history`} wide onClose={() => setHistory(null)}><div className="space-y-4"><AssetHistory asset={history} /><AttachedDocuments entityType="asset" entityId={history.id} /></div></Modal>}
     </>
   );
 }
