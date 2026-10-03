@@ -9,7 +9,6 @@ from sqlalchemy import func, or_, select
 from ..deps import OrgContext, require
 from ..models import Customer, Membership, User, utcnow
 from ..models_service import Attendance, Employee, LeaveRequest, ServiceTicket, Task
-from ..permissions import has_permission
 from ..schemas import Page
 from ..services.timeutil import today
 from ..services.trade import get_owned
@@ -241,7 +240,7 @@ def _leave_out(ctx: OrgContext, lr: LeaveRequest) -> LeaveOut:
 def list_leave(ctx: OrgContext = Depends(require("tasks.view")), status: str | None = None):
     """Managers (employees.view) see everyone's requests; others see only their own."""
     q = select(LeaveRequest).where(LeaveRequest.organization_id == ctx.org_id)
-    if not has_permission(ctx.membership.role, "employees.view"):
+    if not ctx.can("employees.view"):
         me = current_employee(ctx)
         q = q.where(LeaveRequest.employee_id == (me.id if me else -1))
     if status:
@@ -257,7 +256,7 @@ def request_leave(body: LeaveIn, ctx: OrgContext = Depends(require("tasks.view")
             raise HTTPException(422, "Your login is not linked to an employee record")
         emp = me
     else:
-        if not has_permission(ctx.membership.role, "attendance.manage"):
+        if not ctx.can("attendance.manage"):
             raise HTTPException(403, "You can only request leave for yourself")
         emp = get_owned(ctx, Employee, body.employee_id, "Employee", status_code=422)
     overlap = ctx.db.scalar(select(LeaveRequest.id).where(
@@ -317,7 +316,7 @@ def decide_leave(lr_id: int, body: LeaveDecisionIn, ctx: OrgContext = Depends(re
 def cancel_leave(lr_id: int, ctx: OrgContext = Depends(require("tasks.view"))):
     lr = get_owned(ctx, LeaveRequest, lr_id, "Leave request", lock=True)
     me = current_employee(ctx)
-    if not (me and me.id == lr.employee_id) and not has_permission(ctx.membership.role, "attendance.manage"):
+    if not (me and me.id == lr.employee_id) and not ctx.can("attendance.manage"):
         raise HTTPException(403, "Not your request")
     if lr.status != "pending":
         raise HTTPException(409, "Only pending requests can be cancelled")
@@ -431,7 +430,7 @@ class TaskStatusIn(BaseModel):
 def set_task_status(task_id: int, body: TaskStatusIn, ctx: OrgContext = Depends(require("tasks.view"))):
     """Assignees can move their own tasks; managers (tasks.edit) can move any."""
     t = get_owned(ctx, Task, task_id, "Task", lock=True)
-    if not has_permission(ctx.membership.role, "tasks.edit"):
+    if not ctx.can("tasks.edit"):
         me = current_employee(ctx)
         if not me or t.assigned_to != me.id:
             raise HTTPException(403, "You can only update tasks assigned to you")

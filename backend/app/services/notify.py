@@ -12,14 +12,14 @@ import smtplib
 import ssl
 from datetime import timedelta
 from email.message import EmailMessage
-from types import SimpleNamespace
 
 from sqlalchemy import func, select
 
 from ..config import get_settings
+from ..deps import OrgContext
 from ..models import Membership, Organization, Product, StockLevel, User, utcnow
 from ..models_notify import EmailOutbox, Notification, NotificationPref
-from ..permissions import has_permission
+from ..modules import MODULES, effective_permissions, enabled
 from .timeutil import today
 
 log = logging.getLogger("netcare.notify")
@@ -41,15 +41,22 @@ KINDS: dict[str, tuple[str, str | None, bool]] = {
 }
 
 
+# Direct kinds (no permission) still belong to a module.
+KIND_MODULE = {"ticket_assigned": "service", "task_assigned": "people", "leave_decided": "people"}
+assert set(KIND_MODULE.values()) <= set(MODULES)
+
+
 def email_configured() -> bool:
     s = get_settings()
     return bool(s.smtp_host and s.smtp_from)
 
 
 def members_with(db, org_id: int, perm: str | None) -> list[tuple[Membership, User]]:
+    """Active members who hold `perm` in this business (switched-off modules taken into account)."""
+    org = db.get(Organization, org_id)
     rows = db.execute(select(Membership, User).join(User, User.id == Membership.user_id).where(
         Membership.organization_id == org_id, Membership.is_active.is_(True), User.is_active.is_(True))).all()
-    return [(m, u) for m, u in rows if perm is None or has_permission(m.role, perm)]
+    return [(m, u) for m, u in rows if perm is None or perm in effective_permissions(m.role, org)]
 
 
 def _prefs(db, org_id: int, user_id: int, kind: str) -> tuple[bool, bool]:
@@ -63,6 +70,8 @@ def notify(db, org_id: int, kind: str, title: str, body: str | None = None, link
     """Create notifications for the recipients (given user ids, else members with the kind's permission).
     Returns how many were created. Respects preferences; skips duplicates of `dedupe` per user."""
     perm = KINDS[kind][1]
+    if KIND_MODULE.get(kind) and KIND_MODULE[kind] not in enabled(db.get(Organization, org_id)):
+        return 0
     recipients = members_with(db, org_id, perm if users is None else None)
     if users is not None:
         wanted = set(users)
@@ -151,7 +160,7 @@ def run_digests(db, org: Organization) -> int:
 
     # Documents: each recipient sees only what they may see, so count per person.
     for m, u in members_with(db, org.id, KINDS["documents_expiring"][1]):
-        ctx = SimpleNamespace(org_id=org.id, membership=m, db=db)
+        ctx = OrgContext(user=u, org=org, membership=m, db=db, ip=None)
         count = db.scalar(select(func.count()).select_from(visible_query(ctx).where(
             StoredDocument.deleted_at.is_(None), StoredDocument.expires_on.is_not(None),
             StoredDocument.expires_on <= t + timedelta(days=30)).subquery()))

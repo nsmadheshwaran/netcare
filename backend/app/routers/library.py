@@ -18,7 +18,6 @@ from ..models_docs import StoredDocument
 from ..models_finance import FinanceEntry
 from ..models_service import Asset, Employee, ServiceTicket
 from ..models_trade import PurchaseInvoice, PurchaseOrder, SalesInvoice, Supplier
-from ..permissions import has_permission
 from ..schemas import Page
 from ..services import storage
 from ..services.timeutil import today
@@ -82,7 +81,7 @@ class Reason(BaseModel):
 
 
 def _can(ctx: OrgContext, perm: str) -> bool:
-    return has_permission(ctx.membership.role, perm)
+    return ctx.can(perm)
 
 
 def visible_types(ctx: OrgContext) -> list[str]:

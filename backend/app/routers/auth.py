@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from ..db import get_db
 from ..deps import get_current_user
 from ..models import AuditLog, Location, Membership, Organization, User
-from ..permissions import ROLE_PERMISSIONS
+from ..modules import effective_permissions, enabled
 from ..schemas import ChangePasswordIn, LoginIn, MeOut, MembershipOut, RegisterIn, TokenOut, UserOut
 from ..security import create_access_token, hash_password, login_limiter, verify_password
 
@@ -50,7 +50,8 @@ def me(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
                       .order_by(Membership.id)).all()
     return MeOut(user=UserOut.model_validate(user), memberships=[
         MembershipOut(organization_id=m.organization_id, organization_name=m.organization.name, role=m.role,
-                      permissions=sorted(ROLE_PERMISSIONS.get(m.role, set())))
+                      permissions=sorted(effective_permissions(m.role, m.organization)),
+                      modules=sorted(enabled(m.organization)))
         for m in rows if m.organization.is_active])
 
 

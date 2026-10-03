@@ -40,6 +40,11 @@ class OrgContext:
     def org_id(self) -> int:
         return self.org.id
 
+    def can(self, perm: str) -> bool:
+        """Role permission, minus permissions of modules this business has switched off."""
+        from .modules import effective_permissions
+        return perm in effective_permissions(self.membership.role, self.org)
+
     def audit(self, action: str, entity_type: str, entity_id=None, details: dict | None = None) -> None:
         self.db.add(AuditLog(organization_id=self.org.id, user_id=self.user.id, action=action,
                              entity_type=entity_type, entity_id=None if entity_id is None else str(entity_id),
@@ -61,7 +66,9 @@ def get_org_context(request: Request,
 
 def require(perm: str):
     def checker(ctx: OrgContext = Depends(get_org_context)) -> OrgContext:
-        if not has_permission(ctx.membership.role, perm):
+        if not ctx.can(perm):
+            if has_permission(ctx.membership.role, perm):
+                raise HTTPException(status.HTTP_403_FORBIDDEN, "This module is switched off for this business")
             raise HTTPException(status.HTTP_403_FORBIDDEN, f"Missing permission: {perm}")
         return ctx
     return checker

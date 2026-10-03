@@ -60,6 +60,15 @@ Each form was type-checked, and the same API calls they make were exercised.
   customer, paying another tenant's invoice; inventory managers cannot approve POs; accountants are
   read-only on sales; technicians see no sales or payments.
 
+## Results at Phase 10, pilot release 1.0.0 (2026-10-03)
+| Suite | Result |
+|---|---|
+| Backend pytest | **127 passed**: module switches, onboarding, password reset, an end-to-end business day across every module, and the tenant-isolation sweep over every endpoint |
+| Mutation check | Removing the business check in `get_owned` made the isolation sweep fail on several endpoints (reverted) |
+| pyflakes, `tsc`, vitest, Vite build | clean; the built app has no inline scripts, so the new CSP does not block it |
+| Live run | Get started card showed 4 of 7 steps done from the dev data; switching Service off in Settings removed Service, IT Assets and CCTV from the menu at once, and switching it on restored them |
+| Not done | Browser end-to-end tests (Playwright) need a ~150 MB browser download and were not added; the API-level end-to-end test and manual browser checks cover the flows. nginx config could not be syntax-checked here (no Docker) |
+
 ## Results at Phase 9 (2026-10-03)
 | Suite | Result |
 |---|---|

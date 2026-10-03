@@ -181,6 +181,14 @@ requests, PCs whose security turned critical, and a daily summary of overdue inv
 due and expiring documents. Click one to open the page it is about. Choose what you get, in the app or by
 email, under **Alerts → Preferences**. See [NOTIFICATIONS](NOTIFICATIONS.md).
 
+## Modules and getting started
+Owners choose the modules the business uses under **Settings → Modules**. A switched-off module disappears
+for everyone and its data is kept until it is switched on again. The **Get started** card on the Overview
+lists the first steps and ticks them off from your real data; hide it with the × when you are done.
+
+Forgotten password: an owner or manager uses **Users and Roles → Reset password** to set a temporary one and
+tells the person directly.
+
 ## Service jobs
 1. **New ticket.** Pick the customer and the type (repair, installation, maintenance or complaint). Choose
    their registered equipment or describe a walk-in item, note what came with it (charger, bag), and assign a

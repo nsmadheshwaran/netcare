@@ -84,6 +84,9 @@ X-Organization-ID: <organization_id from /auth/me>
 | GET /notifications?unread=, GET /notifications/unread-count, POST /notifications/{id}/read, POST /notifications/read-all | signed-in member (own notifications only) |
 | GET/PUT /notifications/preferences, POST /notifications/test-email | signed-in member |
 | GET /notifications/outbox, POST /notifications/run-digests | org.manage |
+| GET /organization/modules, PUT /organization/modules {enabled: [...]} | member, org.manage |
+| GET /organization/onboarding | member |
+| POST /organization/members/{id}/reset-password {temporary_password} | users.manage |
 | GET /dashboard/summary?period=day,week,month,quarter,year&location_id= | dashboard.view |
 | GET /audit-logs | audit.view |
 | GET /health, GET /ready | public |

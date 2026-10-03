@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AlertTriangle, Boxes, CalendarClock, HandCoins, IndianRupee, Package, Receipt, ShieldAlert, ShoppingCart, UserPlus, Users, Wallet, Wrench } from "lucide-react";
 import { api, inr, qty } from "../api";
+import { Onboarding } from "../components/Setup";
 import { Badge, Empty, ErrorBanner, PageHeader, Spinner, useAsync } from "../components/ui";
 
 const PERIODS = [["day", "Today"], ["week", "This week"], ["month", "This month"], ["quarter", "This quarter"], ["year", "Financial year"]];
@@ -39,6 +40,7 @@ export default function Dashboard() {
 
   return (
     <>
+      <Onboarding />
       <PageHeader title="Overview" subtitle="Live figures from your records"
         actions={<>
           <select className="input !w-auto" value={period} onChange={(e) => setPeriod(e.target.value)} aria-label="Period">

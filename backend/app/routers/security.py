@@ -117,7 +117,9 @@ def _endpoint_out(ctx: OrgContext, e: Endpoint, detail: bool = False, now: datet
 @router.post("/agent/endpoint")
 def agent_endpoint_report(body: EndpointReport, agent: MonitorAgent = Depends(current_agent),
                           db: Session = Depends(get_db)):
-    if not agent.collect_endpoint:
+    from ..models import Organization
+    from ..modules import enabled
+    if not agent.collect_endpoint or "security" not in enabled(db.get(Organization, agent.organization_id)):
         db.commit()  # keep last_seen
         raise HTTPException(403, "Endpoint reporting is not enabled for this agent")
     now = utcnow()

@@ -8,7 +8,8 @@ IT service providers, electronics retailers, schools and SMBs.
 > **Status: Phase 5 (documents and analytics) complete.** Business management, finance and reports, service
 > and repair tickets, technicians, customer equipment, maintenance schedules, employees, attendance, leave,
 > tasks, a secure document library, analytics, network monitoring, CCTV records and endpoint security visibility
-> work end to end, plus a local data organizer and notifications (in app and email). They show as "Planned" in
+> work end to end, plus a local data organizer and notifications (in app and email). **Version 1.0.0 is
+> ready for a pilot with one business:** follow [PILOT](docs/PILOT.md). They show as "Planned" in
 > the UI and appear on the dashboard as "Not yet available", with no placeholder numbers.
 
 ## What works today
@@ -97,7 +98,8 @@ Local dev uses SQLite by default (`netcare_dev.db`). For PostgreSQL, set
 - [x] **Phase 8, data organizer:** local duplicate finder and folder tidier with plan, preview, dry run, approval, journal, rollback, and backup verification
 - [x] **Phase 9, notifications:** in-app bell and Alerts page, per-user preferences, email via SMTP with a retrying outbox, event alerts and daily digests
 - [ ] Phase 9 follow-ups: SMS/WhatsApp (needs a provider account and approved templates), web push
-- [ ] **Phase 10:** module toggles UI, onboarding, security review, E2E tests, pilot release
+- [x] **Phase 10, pilot release 1.0.0:** module switches enforced by the API, Get started checklist, password reset by owners, security review and fixes (IP spoofing, rate limits, CSP), end-to-end and tenant-isolation tests, [pilot checklist](docs/PILOT.md)
+- [ ] After the pilot: emailed invites and self-service password reset, refresh tokens, Playwright browser tests, verified PostgreSQL CI run, agent installer
 
 ## Important limitations
 

@@ -15,7 +15,6 @@ from ..deps import OrgContext, require
 from ..models import Customer, Location, Product, User, utcnow
 from ..models_service import Asset, Employee, MaintenanceSchedule, ServiceTicket, Task, TicketEvent, TicketPart
 from ..models_trade import SalesInvoice
-from ..permissions import has_permission
 from ..schemas import Page
 from ..schemas_trade import InvoiceIn, InvoiceOut, LineIn
 from ..services import billing, inventory
@@ -66,10 +65,9 @@ def _notify_assigned(ctx: OrgContext, t: ServiceTicket) -> None:
 
 def _can_work(ctx: OrgContext, t: ServiceTicket) -> None:
     """service.edit may touch any ticket; service.work only tickets assigned to the caller."""
-    role = ctx.membership.role
-    if has_permission(role, "service.edit"):
+    if ctx.can("service.edit"):
         return
-    if has_permission(role, "service.work"):
+    if ctx.can("service.work"):
         me = current_employee(ctx)
         if me and t.assigned_to == me.id:
             return
@@ -362,7 +360,7 @@ def change_status(tid: int, body: StatusIn, ctx: OrgContext = Depends(require("s
     t = get_owned(ctx, ServiceTicket, tid, "Ticket", lock=True)
     _can_work(ctx, t)
     new = body.status
-    if new in MANAGER_ONLY and not has_permission(ctx.membership.role, "service.edit"):
+    if new in MANAGER_ONLY and not ctx.can("service.edit"):
         raise HTTPException(403, f"Only the office can mark a ticket {new}")
     if new not in TRANSITIONS[t.status]:
         raise HTTPException(409, f"Cannot move a {t.status.replace('_', ' ')} ticket to {new.replace('_', ' ')}")
@@ -410,9 +408,9 @@ class NoteIn(BaseModel):
 def add_note(tid: int, body: NoteIn, ctx: OrgContext = Depends(require("service.view"))):
     """Record communication: calls, customer messages, internal notes."""
     t = get_owned(ctx, ServiceTicket, tid, "Ticket")
-    if not (has_permission(ctx.membership.role, "service.edit") or has_permission(ctx.membership.role, "service.work")):
+    if not (ctx.can("service.edit") or ctx.can("service.work")):
         raise HTTPException(403, "Missing permission: service.work")
-    if not has_permission(ctx.membership.role, "service.edit"):
+    if not ctx.can("service.edit"):
         _can_work(ctx, t)
     _event(ctx, t, "note", body.message)
     ctx.db.commit()
@@ -506,7 +504,7 @@ class TicketInvoiceIn(BaseModel):
 def invoice_ticket(tid: int, body: TicketInvoiceIn, ctx: OrgContext = Depends(require("service.edit"))):
     """Draft invoice for the parts and labour on a completed job. Parts are already out of stock,
     so issuing this invoice will not deduct them again."""
-    if not has_permission(ctx.membership.role, "sales.edit"):
+    if not ctx.can("sales.edit"):
         raise HTTPException(403, "Missing permission: sales.edit")
     t = get_owned(ctx, ServiceTicket, tid, "Ticket", lock=True)
     if t.status not in ("completed", "closed"):

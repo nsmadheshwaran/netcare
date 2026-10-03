@@ -354,6 +354,11 @@ def current_agent(request: Request, authorization: str | None = Header(None),
     a = db.scalar(select(MonitorAgent).where(MonitorAgent.token_hash == mon.hash_token(authorization[7:].strip())))
     if a is None or a.status != "active":
         raise unauthorized
+    from ..models import Organization
+    from ..modules import enabled
+    org = db.get(Organization, a.organization_id)
+    if not org.is_active or "monitoring" not in enabled(org):
+        raise HTTPException(403, "Monitoring is switched off for this business")
     a.last_seen_at = utcnow()
     a.last_ip = request.client.host if request.client else None
     a.agent_version = (x_agent_version or "")[:20] or a.agent_version

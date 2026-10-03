@@ -64,6 +64,7 @@ class MembershipOut(ORM):
     organization_name: str
     role: str
     permissions: list[str]
+    modules: list[str] = []
 
 
 class MeOut(BaseModel):
@@ -88,6 +89,12 @@ class OrgIn(BaseModel):
     # Applies to sequences started after the change (i.e. doc types not yet used this financial year).
     numbering_prefixes: dict[str, str] | None = None
     _g = field_validator("gstin")(classmethod(lambda cls, v: _gstin(v)))
+
+    @field_validator("enabled_modules")
+    @classmethod
+    def _modules(cls, v):
+        from .modules import validate
+        return None if v is None else validate(v)
 
     @field_validator("numbering_prefixes")
     @classmethod

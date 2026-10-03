@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.0.0 (2026-10-03): Phase 10, pilot release
+### Added
+- Module switches (Settings → Modules): Buying and selling, Finance, Service, People, Documents, Network
+  monitoring, Endpoint security. Enforced by the API (switched-off permissions are removed for every role),
+  reflected in the menu, reports, notifications and agents; data is kept.
+- Get started checklist on the Overview, computed from real data.
+- Owners and managers can reset a staff member's password (not for logins shared with another business).
+- Tests: end-to-end business day across every module; automated tenant-isolation sweep over every endpoint.
+- `docs/PILOT.md` go-live checklist.
+
+### Security
+- nginx no longer forwards client-supplied `X-Forwarded-For` (clients could fake their IP for the login rate
+  limit and audit log).
+- Rate limits for login, agent and API requests; Content-Security-Policy and Permissions-Policy headers;
+  static-file locations no longer drop the security headers.
+- Saving business details can no longer switch modules back on by omission.
+
 ## 0.9.0 (2026-10-03): Phase 9, notifications
 ### Added
 - In-app notifications: header bell with unread count, Alerts page (unread/all, mark read, open the related

@@ -58,12 +58,26 @@
 - **Network:** PostgreSQL has no published port in Docker Compose. The web container binds to 127.0.0.1 only,
   so traffic must come through your HTTPS proxy.
 
+## Security review for the pilot release (2026-10-03)
+| Area | What was checked | Result |
+|---|---|---|
+| Tenant isolation | Automated sweep (`test_release.py`): a second business calls **every** API endpoint that takes an id, with the first business's ids, as owner | No endpoint answers 2xx or 5xx. A deliberate break of the ownership check made the sweep fail on several endpoints, so the test is a real guard |
+| Authorisation | Every endpoint uses a permission; switched-off modules remove permissions server-side | Covered by role tests in every phase and `test_module_switches` |
+| Server errors | Smoke test calls every list endpoint as owner | No 500s |
+| Client IP spoofing | nginx appended client-supplied `X-Forwarded-For`, and uvicorn trusts forwarded headers | **Fixed:** nginx now overwrites it with the real address. Login rate limit and audit IPs can no longer be faked |
+| Rate limiting | Login, agent and general API | **Added** in nginx: login 10/min, agent API 120/min, API 20/s per address (bursts allowed) |
+| Browser hardening | Headers on the web app | **Added** Content-Security-Policy (own scripts only, no inline scripts), Permissions-Policy, `server_tokens off`. Fixed: per-location `add_header` would have dropped the security headers on static files |
+| Settings overwrite | Saving business details resent stale module choices; an omitted field re-enabled every module | **Fixed** in the API and the UI |
+| Account recovery | No way to recover a forgotten password | **Added** owner/manager reset, refused for logins that belong to another business (no cross-business takeover), signs the user out everywhere, audited |
+| Tokens | JWT algorithm pinned (HS256), token type checked, revocation by token version | No change needed |
+
+Still open (below).
+
 ## Known limitations (fix before going live)
 - **No malware scanning of uploads.** The allow-list blocks executables and macro documents, but a malicious
   PDF or image could still target a reader's PDF/image software. Add ClamAV (or similar) before accepting
   files from outside the business.
-- **Agent endpoints have no rate limit.** Tokens are unguessable, but a flood of requests with bad tokens
-  still costs a database lookup each. Put rate limiting on `/api/v1/agent/` in your reverse proxy.
+- **Rate limits live in the bundled nginx.** If you expose the backend another way, add equivalent limits.
 - **Documents are not encrypted at rest** by NetCare. Use disk encryption on the server.
 - **Tokens live in `localStorage`.** That is simple but readable by any XSS. React escapes output and there is
   no raw HTML rendering, but before production consider httpOnly cookies with CSRF protection.

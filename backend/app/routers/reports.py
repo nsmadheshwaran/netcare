@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 
 from ..deps import OrgContext, require
-from ..permissions import has_permission
+from ..modules import REPORT_MODULE, enabled
 from ..services import export
 from ..services.reports import CATALOG, REPORT_PERMS
 from ..services.timeutil import today
@@ -21,7 +21,8 @@ MEDIA = {"csv": ("text/csv; charset=utf-8", "csv"),
 
 def _allowed(ctx: OrgContext, key: str) -> bool:
     perm = REPORT_PERMS.get(key)
-    return perm is None or has_permission(ctx.membership.role, perm)
+    mod = REPORT_MODULE.get(key)
+    return (perm is None or ctx.can(perm)) and (mod is None or mod in enabled(ctx.org))
 
 
 def _period(date_from: date | None, date_to: date | None) -> tuple[date, date]:
@@ -90,7 +91,8 @@ def run_report(key: str, ctx: OrgContext = Depends(require("reports.view")),
     if key not in CATALOG:
         raise HTTPException(404, "Unknown report")
     if not _allowed(ctx, key):
-        raise HTTPException(403, f"Missing permission: {REPORT_PERMS[key]}")
+        raise HTTPException(403, f"Missing permission: {REPORT_PERMS[key]}" if key in REPORT_PERMS
+                            and not ctx.can(REPORT_PERMS[key]) else "This module is switched off for this business")
     title, kind, fn = CATALOG[key]
     t = today()
     if kind == "period":

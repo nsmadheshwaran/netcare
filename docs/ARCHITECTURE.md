@@ -152,6 +152,13 @@ Customer site: (future) Windows agent --outbound HTTPS, per-agent revocable toke
   requested/decided).
 - `main.lifespan` starts a daemon thread that calls `sweep()` every 60 seconds (off in tests).
 
+## Modules (Phase 10)
+`app/modules.py` maps each optional module to permission prefixes. `OrgContext.can()` and `require()` use
+`effective_permissions(role, org)`, which removes the permissions of switched-off modules, so no endpoint needs
+its own module check. `/auth/me` returns the effective permissions, so the menu hides modules too. Agents are
+refused when monitoring (or, for Defender reports, endpoint security) is off. Reports and notifications follow
+the same rules.
+
 ## Frontend layout (`frontend/src`)
 - `api.ts`: fetch wrapper and error formatting
 - `auth.tsx`: session and permissions context

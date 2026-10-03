@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Plus } from "lucide-react";
 import { api, type Page } from "../api";
 import { useAuth } from "../auth";
+import { ModuleSwitches } from "../components/Setup";
 import { Badge, Empty, ErrorBanner, Field, Modal, PageHeader, Pager, Spinner, useAsync } from "../components/ui";
 
 const ROLES = ["owner", "manager", "accountant", "salesperson", "inventory_manager", "technician", "receptionist", "viewer"];
@@ -17,6 +18,13 @@ export function Users() {
   async function update(m: Member, body: Partial<Member>) {
     setActionError(null);
     try { await api(`/organization/members/${m.id}`, { method: "PATCH", json: body }); reload(); }
+    catch (err: any) { setActionError(err.message); }
+  }
+  async function resetPassword(m: Member) {
+    setActionError(null);
+    const pw = window.prompt(`New temporary password for ${m.full_name} (at least 10 characters). Tell it to them in person; they should change it after signing in.`);
+    if (!pw) return;
+    try { await api(`/organization/members/${m.id}/reset-password`, { method: "POST", json: { temporary_password: pw } }); window.alert("Password reset. They have been signed out everywhere."); }
     catch (err: any) { setActionError(err.message); }
   }
   async function add(e: FormEvent) {
@@ -45,7 +53,10 @@ export function Users() {
                 </td>
                 <td className="td">
                   {m.email === me?.user.email ? <Badge tone="indigo">you</Badge> : (
-                    <button className="btn-ghost !py-1 text-xs" onClick={() => update(m, { is_active: !m.is_active })}>{m.is_active ? "Deactivate" : "Reactivate"}</button>
+                    <span className="flex gap-1">
+                      <button className="btn-ghost !py-1 text-xs" onClick={() => update(m, { is_active: !m.is_active })}>{m.is_active ? "Deactivate" : "Reactivate"}</button>
+                      <button className="btn-ghost !py-1 text-xs" onClick={() => resetPassword(m)}>Reset password</button>
+                    </span>
                   )}
                 </td>
               </tr>))}</tbody>
@@ -185,7 +196,8 @@ export function Settings() {
   async function save(e: FormEvent) {
     e.preventDefault();
     setError(null); setMsg(null);
-    const { id: _id, currency: _c, has_logo: _l, ...body } = form;
+    // Modules are saved by their own switches; sending the copy loaded with this form could undo a change.
+    const { id: _id, currency: _c, has_logo: _l, enabled_modules: _m, ...body } = form;
     for (const k of Object.keys(body)) if (body[k] === "") body[k] = null;
     try { await api("/organization", { method: "PUT", json: body }); setMsg("Saved."); refresh(); }
     catch (err: any) { setError(err.message); }
@@ -211,6 +223,7 @@ export function Settings() {
       <PageHeader title="Settings" />
       <ErrorBanner message={error} />
       {msg && <div className="mb-3 text-sm text-emerald-600">{msg}</div>}
+      <div className="mb-4"><ModuleSwitches /></div>
       <div className="grid gap-4 lg:grid-cols-2">
         <form className="card space-y-3" onSubmit={save}>
           <h3 className="font-medium">Business details</h3>

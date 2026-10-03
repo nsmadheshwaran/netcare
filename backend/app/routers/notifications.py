@@ -6,7 +6,6 @@ from sqlalchemy import func, select, update
 from ..deps import OrgContext, get_org_context, require
 from ..models import utcnow
 from ..models_notify import EmailOutbox, Notification, NotificationPref
-from ..permissions import has_permission
 from ..services import notify as nt
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
@@ -71,7 +70,7 @@ def get_preferences(ctx: OrgContext = Depends(get_org_context)):
         NotificationPref.user_id == ctx.user.id, NotificationPref.organization_id == ctx.org_id))}
     out = []
     for kind, (label, perm, email_default) in nt.KINDS.items():
-        if perm and not has_permission(ctx.membership.role, perm):
+        if perm and not ctx.can(perm):
             continue
         p = saved.get(kind)
         out.append({"kind": kind, "label": label, "in_app": p.in_app if p else True,

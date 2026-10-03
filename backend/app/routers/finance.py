@@ -237,8 +237,7 @@ def list_entries(ctx: OrgContext = Depends(require("expenses.view")), kind: str 
 
 @router.post("/finance-entries", response_model=EntryOut, status_code=201)
 def create_entry(body: EntryIn, ctx: OrgContext = Depends(require("expenses.view"))):
-    from ..permissions import has_permission
-    if not has_permission(ctx.membership.role, PERM_FOR[body.kind]):
+    if not ctx.can(PERM_FOR[body.kind]):
         raise HTTPException(403, f"Missing permission: {PERM_FOR[body.kind]}")
     if body.idempotency_key:
         prior = ctx.db.scalar(select(FinanceEntry).where(FinanceEntry.organization_id == ctx.org_id,
@@ -270,8 +269,7 @@ def create_entry(body: EntryIn, ctx: OrgContext = Depends(require("expenses.view
 @router.post("/finance-entries/{entry_id}/void", response_model=EntryOut)
 def void_entry(entry_id: int, body: CancelIn, ctx: OrgContext = Depends(require("expenses.view"))):
     e = get_owned(ctx, FinanceEntry, entry_id, "Entry", lock=True)
-    from ..permissions import has_permission
-    if not has_permission(ctx.membership.role, PERM_FOR[e.kind]):
+    if not ctx.can(PERM_FOR[e.kind]):
         raise HTTPException(403, f"Missing permission: {PERM_FOR[e.kind]}")
     if e.voided_at:
         raise HTTPException(409, "Already voided")
