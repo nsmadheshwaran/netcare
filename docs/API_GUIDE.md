@@ -56,6 +56,7 @@ X-Organization-ID: <organization_id from /auth/me>
 | POST, GET, DELETE /organization/logo | org.manage (GET: any member) |
 | GET/POST /service-tickets, GET/PATCH /service-tickets/{id} | service.view, service.edit (PATCH: service.work on own tickets) |
 | POST /service-tickets/{id}/status, /notes, /approval, /parts, /parts/{pid}/return | service.work on own tickets, or service.edit |
+| GET /service-tickets/{id}/signature (PNG drawn by the customer; `/approval` accepts `signature_png` + `signed_by`) | service.view |
 | POST /service-tickets/{id}/assign | service.edit |
 | POST /service-tickets/{id}/invoice | service.edit + sales.edit |
 | POST /service-tickets/{id}/assets (register installed equipment) | assets.edit |

@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { CalendarClock, CheckCircle2, FileSignature, MessageSquare, Package, Plus, Printer, Receipt, Undo2, Wrench, XCircle } from "lucide-react";
 import { api, inr, openPdf, qty, type Page } from "../api";
 import { useAuth } from "../auth";
@@ -12,7 +12,7 @@ export type Ticket = {
   serial_number: string | null; accessories_received: string | null; reported_problem: string; diagnosis: string | null;
   work_performed: string | null; resolution: string | null; assigned_to: number | null; technician_name: string | null;
   scheduled_visit: string | null; estimate_amount: string | null; labour_charge: string; customer_approval: string;
-  approval_note: string | null; is_warranty: boolean; sales_invoice_id: number | null; invoice_number: string | null;
+  approval_note: string | null; approval_signed_by: string | null; has_signature: boolean; is_warranty: boolean; sales_invoice_id: number | null; invoice_number: string | null;
   parts_total: string; charges_total: string; created_at: string; completed_at: string | null;
   parts: { id: number; product_name: string; sku: string; quantity: string; unit_price: string; returned: boolean }[];
   events: { id: number; kind: string; message: string; user_name: string | null; created_at: string }[];
@@ -129,6 +129,17 @@ function RegisterAssets({ t, onDone }: { t: Ticket; onDone: () => void }) {
   );
 }
 
+function SignatureImage({ ticketId, signedBy }: { ticketId: number; signedBy: string | null }) {
+  const [src, setSrc] = useState<string | null>(null);
+  useEffect(() => {
+    let url: string | null = null, alive = true;
+    api<Blob>(`/service-tickets/${ticketId}/signature`).then((b) => { if (alive) { url = URL.createObjectURL(b); setSrc(url); } }).catch(() => {});
+    return () => { alive = false; if (url) URL.revokeObjectURL(url); };
+  }, [ticketId]);
+  if (!src) return null;
+  return <div className="mt-1"><img src={src} alt={`Signature of ${signedBy ?? "customer"}`} className="h-16 rounded border border-slate-300 bg-white" /><div className="text-xs text-slate-500">Signed on screen by {signedBy}</div></div>;
+}
+
 function SignaturePad({ ticketId, onDone }: { ticketId: number; onDone: () => void }) {
   const [name, setName] = useState("");
   const [drawing, setDrawing] = useState(false);
@@ -169,10 +180,16 @@ function SignaturePad({ ticketId, onDone }: { ticketId: number; onDone: () => vo
   async function save() {
     if (!name.trim()) { setError("Customer name is required"); return; }
     if (!hasDraw) { setError("Please sign in the box first"); return; }
+    const src = canvas();
+    if (!src) return;
+    const flat = document.createElement("canvas");  // the pad is transparent; save the signature on white
+    flat.width = src.width; flat.height = src.height;
+    const fctx = flat.getContext("2d")!;
+    fctx.fillStyle = "#ffffff"; fctx.fillRect(0, 0, flat.width, flat.height); fctx.drawImage(src, 0, 0);
     try {
       await api(`/service-tickets/${ticketId}/approval`, {
         method: "POST",
-        json: { decision: "approved", note: `Signed on screen by ${name.trim()} (signature image is not stored)` },
+        json: { decision: "approved", signed_by: name.trim(), signature_png: flat.toDataURL("image/png") },
       });
       onDone();
     } catch (err: any) { setError(err.message); }
@@ -271,6 +288,7 @@ export function TicketDetail({ id, onChanged }: { id: number; onChanged?: () => 
             <button className="btn-primary !py-1 text-xs" onClick={() => setMode("sig")}><FileSignature size={13} /> Sign on tablet</button>
             <button className="btn-ghost !py-1 text-xs text-red-600" onClick={() => post("/approval", { decision: "declined" })}>Declined</button></div>}
           {t.approval_note && <div className="text-xs text-slate-500">{t.approval_note}</div>}
+          {t.has_signature && <SignatureImage ticketId={t.id} signedBy={t.approval_signed_by} />}
         </div>
         <div className="card !p-3"><div className="text-xs text-slate-500">Charges (before GST)</div>
           <div className="font-medium">{t.is_warranty ? "No charge (warranty)" : inr(t.charges_total)}</div>

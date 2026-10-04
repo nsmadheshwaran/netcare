@@ -1,11 +1,15 @@
 """Service and repair: tickets, parts used, customer approval, billing, assets, maintenance, technician workspace."""
+import base64
+import binascii
 import calendar
+import io
 import ipaddress
 import re
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from typing import Literal
 
+from PIL import Image, UnidentifiedImageError
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
@@ -162,6 +166,8 @@ class TicketOut(ORM):
     customer_approval: str
     approval_note: str | None
     approved_at: datetime | None
+    approval_signed_by: str | None = None
+    has_signature: bool = False
     is_warranty: bool
     maintenance_schedule_id: int | None
     sales_invoice_id: int | None
@@ -178,6 +184,7 @@ class TicketOut(ORM):
 def _ticket_out(ctx: OrgContext, t: ServiceTicket, detail: bool = False) -> TicketOut:
     o = TicketOut.model_validate({**{c: getattr(t, c) for c in TicketOut.model_fields
                                      if hasattr(t, c) and c not in ("parts", "events")}})
+    o.has_signature = t.approval_signed_by is not None  # name and image are only ever stored together
     o.customer_name = ctx.db.get(Customer, t.customer_id).name
     if t.asset_id:
         o.asset_name = ctx.db.get(Asset, t.asset_id).name
@@ -417,9 +424,46 @@ def add_note(tid: int, body: NoteIn, ctx: OrgContext = Depends(require("service.
     return _ticket_out(ctx, t, detail=True)
 
 
+MAX_SIGNATURE_BYTES = 150 * 1024
+MAX_SIGNATURE_SIDE = 2000
+
+
 class ApprovalIn(BaseModel):
     decision: Literal["approved", "declined"]
     note: str | None = Field(default=None, max_length=1000)  # e.g. "Approved by phone, spoke to Mr. Ravi"
+    signature_png: str | None = Field(default=None, max_length=300_000)  # base64 or a data:image/png;base64 URL
+    signed_by: str | None = Field(default=None, max_length=200)  # who signed; required with a signature
+
+
+def _decode_signature(data: str) -> bytes:
+    """A signature must be a real, small PNG; anything else is refused before it is stored or put in a PDF."""
+    if data.startswith("data:"):
+        head, _, data = data.partition(",")
+        if head.lower() != "data:image/png;base64":
+            raise HTTPException(422, "The signature must be a PNG image")
+    try:
+        raw = base64.b64decode(data, validate=True)
+    except (binascii.Error, ValueError):
+        raise HTTPException(422, "The signature image is not valid base64")
+    if not raw or len(raw) > MAX_SIGNATURE_BYTES:
+        raise HTTPException(422, f"The signature image must be under {MAX_SIGNATURE_BYTES // 1024} KB")
+    try:
+        with Image.open(io.BytesIO(raw)) as img:
+            fmt, (w, h) = img.format, img.size
+            if fmt != "PNG" or not (0 < w <= MAX_SIGNATURE_SIDE and 0 < h <= MAX_SIGNATURE_SIDE):
+                raise HTTPException(422, "The signature must be a PNG image up to 2000 x 2000 pixels")
+            img.load()
+            if img.mode in ("RGBA", "LA") or "transparency" in img.info:
+                # A canvas exports a transparent background, which prints black: flatten onto white.
+                rgba = img.convert("RGBA")
+                flat = Image.new("RGB", rgba.size, "white")
+                flat.paste(rgba, mask=rgba.getchannel("A"))
+                out = io.BytesIO()
+                flat.save(out, "PNG")
+                raw = out.getvalue()
+    except (UnidentifiedImageError, OSError, SyntaxError):
+        raise HTTPException(422, "The signature image is damaged or not a PNG")
+    return raw
 
 
 @router.post("/service-tickets/{tid}/approval", response_model=TicketOut)
@@ -428,12 +472,30 @@ def record_approval(tid: int, body: ApprovalIn, ctx: OrgContext = Depends(requir
     _can_work(ctx, t)
     if t.customer_approval != "pending":
         raise HTTPException(409, "No estimate is awaiting approval")
+    signature = None
+    if body.signature_png:
+        if not (body.signed_by or "").strip():
+            raise HTTPException(422, "Enter the name of the person who signed")
+        signature = _decode_signature(body.signature_png)
     t.customer_approval, t.approval_note, t.approved_at = body.decision, body.note, utcnow()
+    if signature:
+        t.approval_signature, t.approval_signed_by = signature, body.signed_by.strip()
     _event(ctx, t, "approval", f"Customer {body.decision} the estimate of Rs {t.estimate_amount}"
+                               + (f" (signed on screen by {t.approval_signed_by})" if signature else "")
                                + (f": {body.note}" if body.note else ""))
-    ctx.audit(body.decision, "service_estimate", t.id, {"amount": str(t.estimate_amount), "note": body.note})
+    ctx.audit(body.decision, "service_estimate", t.id,
+              {"amount": str(t.estimate_amount), "note": body.note, "signed_by": t.approval_signed_by})
     ctx.db.commit()
     return _ticket_out(ctx, t, detail=True)
+
+
+@router.get("/service-tickets/{tid}/signature")
+def ticket_signature(tid: int, ctx: OrgContext = Depends(require("service.view"))):
+    t = get_owned(ctx, ServiceTicket, tid, "Ticket")
+    if t.approval_signature is None:
+        raise HTTPException(404, "No signature was recorded for this ticket")
+    return Response(t.approval_signature, media_type="image/png",
+                    headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"})
 
 
 # ---------------- parts ----------------
@@ -918,7 +980,7 @@ def ticket_pdf(tid: int, ctx: OrgContext = Depends(require("service.view")), dow
     out = _ticket_out(ctx, t, detail=True)
     installed = ctx.db.scalars(select(Asset).where(Asset.organization_id == ctx.org_id,
                                                    Asset.installed_by_ticket_id == t.id).order_by(Asset.id)).all()
-    body = service_report_pdf(ctx.org, out, ctx.db.get(Customer, t.customer_id), installed)
+    body = service_report_pdf(ctx.org, out, ctx.db.get(Customer, t.customer_id), installed, t.approval_signature)
     disp = "attachment" if download else "inline"
     return Response(body, media_type="application/pdf",
                     headers={"Content-Disposition": f'{disp}; filename="{t.number.replace("/", "-")}.pdf"'})

@@ -5,7 +5,7 @@ Payroll and statutory employment compliance are deliberately not modelled.
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import CheckConstraint, Date, ForeignKey, Index, Integer, String, Text, UniqueConstraint
+from sqlalchemy import CheckConstraint, Date, ForeignKey, Index, Integer, LargeBinary, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base
@@ -151,6 +151,9 @@ class ServiceTicket(TimestampMixin, Base):
     # not_required | pending | approved | declined
     approval_note: Mapped[str | None] = mapped_column(Text)
     approved_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    # Signature drawn on a tablet (PNG). Deferred so ticket lists never load the image bytes.
+    approval_signature: Mapped[bytes | None] = mapped_column(LargeBinary, deferred=True)
+    approval_signed_by: Mapped[str | None] = mapped_column(String(200))
     is_warranty: Mapped[bool] = mapped_column(Boolean, default=False)  # no charge to customer
     maintenance_schedule_id: Mapped[int | None] = mapped_column(ForeignKey("maintenance_schedules.id"))
     sales_invoice_id: Mapped[int | None] = mapped_column(ForeignKey("sales_invoices.id"))

@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.3.0 (2026-10-04)
+### Added
+- Customer signatures drawn on a tablet are now stored with the service ticket (migration 0012), shown on the
+  ticket and printed on the job sheet. Strictly validated PNG; transparent backgrounds are flattened onto white.
+### Fixed
+- The job sheet printed the customer's name twice when the contact name was left as the default.
+### Verified
+- Upgrade from an older version with real data (invoice, payment, stock): migrations ran, data and sign-in intact.
+
 ## 1.2.0 (2026-10-04)
 ### Added
 - Windows install for customers: `install\install.ps1` (random passwords, build, start, daily backup task, optional `-AllowLan`), `scripts\backup.ps1` and `scripts\restore.ps1` (tested with real data, including documents), and [HANDOVER](docs/HANDOVER.md).

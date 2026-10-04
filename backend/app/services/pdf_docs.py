@@ -283,7 +283,7 @@ def thermal_receipt_pdf(org, inv, customer) -> bytes:
     return buf.getvalue()
 
 
-def service_report_pdf(org, t, customer, installed=()) -> bytes:
+def service_report_pdf(org, t, customer, installed=(), signature: bytes | None = None) -> bytes:
     """Job sheet / completion report for a service ticket. `t` is a TicketOut with parts and events;
     `installed` are assets registered by this ticket."""
     st = _styles()
@@ -302,9 +302,10 @@ def service_report_pdf(org, t, customer, installed=()) -> bytes:
     story = [Table([[([logo] if logo else []) + _org_block(org, st), right]], colWidths=[100 * mm, 82 * mm],
                    style=[("VALIGN", (0, 0), (-1, -1), "TOP")]), Spacer(1, 4 * mm)]
 
-    cust = [Paragraph("<b>Customer</b>", st["small"]), _p(customer.business_name or customer.name, st["bold"])]
+    shown = customer.business_name or customer.name
+    cust = [Paragraph("<b>Customer</b>", st["small"]), _p(shown, st["bold"])]
     for x in (t.contact_name, t.contact_phone, customer.shipping_address or customer.billing_address):
-        if x:
+        if x and x != shown:  # the contact defaults to the customer's own name
             cust.append(_p(x, st["base"]))
     equip_name = t.asset_name or t.equipment or (f"{len(installed)} item(s) installed, listed below" if installed
                                                   else "Not specified")
@@ -372,7 +373,16 @@ def service_report_pdf(org, t, customer, installed=()) -> bytes:
             line += f" ({t.approval_note})"
         story += [Spacer(1, 3 * mm), _p(line, st["base"])]
 
-    sig = Table([[Paragraph("Customer signature<br/><br/><br/>Name:", st["base"]),
+    if signature:
+        img = ImageReader(io.BytesIO(signature))
+        w, h = img.getSize()
+        scale = min(50 * mm / w, 18 * mm / h)
+        cust_sig = [Paragraph("Customer signature", st["base"]),
+                    Image(io.BytesIO(signature), width=w * scale, height=h * scale, hAlign="LEFT"),
+                    Paragraph(f"Name: {esc(t.approval_signed_by or '')}", st["base"])]
+    else:
+        cust_sig = Paragraph("Customer signature<br/><br/><br/>Name:", st["base"])
+    sig = Table([[cust_sig,
                   Paragraph(f"For <b>{esc(org.name)}</b><br/><br/><br/>Technician / authorised signatory",
                             st["right"])]], colWidths=[91 * mm, 91 * mm])
     story += [Spacer(1, 10 * mm), sig, Spacer(1, 4 * mm),

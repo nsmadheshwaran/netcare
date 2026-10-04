@@ -58,7 +58,7 @@ document never changes if a product price or tax rate changes later.
 | leave_requests | Pending/approved/rejected/cancelled; approval fills attendance |
 | tasks | Assigned work with priority, due date, optional customer/ticket link |
 | assets | Customer equipment; serial unique per business; `installed_by_ticket_id` is a plain id (no FK) to avoid a cycle with tickets |
-| service_tickets | The job: type, status, technician, estimate/approval, labour, warranty flag, links to schedule and invoice |
+| service_tickets | The job: type, status, technician, estimate/approval (with the customer's drawn signature and signer name), labour, warranty flag, links to schedule and invoice |
 | ticket_parts | Parts used, with the stock movement out and (if returned) back |
 | ticket_events | Append-only timeline |
 | maintenance_schedules | Interval in months, next due, last done |

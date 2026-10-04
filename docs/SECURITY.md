@@ -22,6 +22,9 @@
 - **Uploads (logo):** limited to 300 KB and 4000 × 4000 pixels. The type is detected from the file's bytes
   (PNG/JPEG signatures), never from its name or declared type, and the image must decode. Logos are stored in
   the database and served only to signed-in members of that business.
+- **Uploads (tablet signature):** a PNG of at most 150 KB and 2000 x 2000 pixels, checked by decoding it (not
+  by its name or declared type); transparent backgrounds are flattened onto white. It is stored with the
+  service ticket, never returned in ticket JSON, and served only to signed-in members of that business.
 - **Uploads (documents):** 15 MB per file and a per-business quota (both configurable). The type is detected
   from the bytes and checked against an allow-list (PDF, images, DOCX/XLSX without macros, UTF-8 text/CSV);
   executables, archives, macro-enabled Office files and ZIP bombs are refused. File names are reduced to a

@@ -88,7 +88,7 @@ Local dev uses SQLite by default (`netcare_dev.db`). For PostgreSQL, set
 - [ ] Phase 2 follow-ups: sales orders (deliberately skipped; quotation → invoice covers current needs), serial-number capture at sale, tax-inclusive pricing, per-location user restrictions
 - [x] **Phase 3, finance and GST:** expenses, accounts, P&L and cash flow, versioned tax rates, tax-inclusive prices, PDF invoices and receipts, Excel/CSV/PDF exports, draft GST summary
 - [x] **Phase 4, service and employees:** tickets, technicians, approvals, parts, ticket billing, assets and warranty, maintenance schedules, employees, attendance, leave, tasks, 5 new reports
-- [ ] Phase 4 follow-ups: SMS/WhatsApp job updates to customers (needs a provider), customer signature capture on a tablet, technician mobile layout polish
+- [ ] Phase 4 follow-ups: SMS/WhatsApp job updates to customers (needs a provider), technician mobile layout polish
 - [ ] Phase 3 follow-ups: emailing invoices (needs an email provider), bank statement reconciliation, credit note PDF, GSTR-format exports (only after accountant validation)
 - [x] **Phase 5, documents and analytics:** secure document library attached to records, expiry tracking, analytics with period comparison, all-reports ZIP export
 - [ ] Phase 5 follow-ups: antivirus scanning of uploads, image thumbnails, document versioning, scheduled emailing of report packs (needs an email provider)

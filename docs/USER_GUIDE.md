@@ -196,7 +196,9 @@ signed in for up to 30 days of inactivity on a device; **Sign out** ends that.
    their registered equipment or describe a walk-in item, note what came with it (charger, bag), and assign a
    technician.
 2. If you give an **estimate**, work can't start until you record the customer's answer (**Customer
-   approved**, with a note such as "by phone").
+   approved**, with a note such as "by phone"), or hand the tablet to the customer: **Sign on tablet** asks for
+   their name and a signature drawn on the screen. The signature is saved with the ticket, shown on it, and
+   printed on the job sheet.
 3. The technician opens **My work**, starts the job, writes the diagnosis, and adds **parts from stock**.
    Unused parts can be returned.
 4. Record the **work performed**, then **Mark completed**.

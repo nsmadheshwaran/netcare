@@ -38,19 +38,20 @@ port to the internet. The firewall step needs Administrator and has not been tes
 
 ## Updates
 Run `scripts\backup.ps1` first. Then put the new NetCare files in the same folder (keep `.env` and `backups`)
-and run `docker compose up -d --build`. Database changes apply automatically on start. This upgrade path has
-not been tested on a customer install yet, so take the backup and keep it until the new version works.
+and run `docker compose up -d --build`. Database changes apply automatically on start. This upgrade path was tested once with
+sample data (an older version with an issued invoice, payment and stock upgraded to the current one: the data,
+sign-in and PDFs were intact), but take the backup and keep it until the new version works.
 
 ## Tell the customer what NetCare is not
 - Not accounting or GST-filing software: the GST summary is a draft for their accountant.
 - No GST e-invoice (IRN) or e-way bill.
-- Signatures captured on a tablet are not stored as images (only a note that the customer signed).
 - Email, SMS and WhatsApp alerts work only after they add their own SMTP / Twilio details
   (see [NOTIFICATIONS](NOTIFICATIONS.md)).
 
 ## Before you take payment (things only you can decide)
 - **Sales agreement:** price, what support is included and for how long, who owns the data (the customer),
-  and a limit on your liability. Have a lawyer review it; this document is not legal advice.
+  and a limit on your liability. A starting draft is in [SALES_AGREEMENT_TEMPLATE](SALES_AGREEMENT_TEMPLATE.md).
+  Have a lawyer review it; neither document is legal advice.
 - **Support:** decide how problems are reported and how fast you answer. They will run a business on this.
 - **Accountant:** ask the customer's accountant to check one printed invoice before real use.
 - **Licence and source code:** decide whether the customer receives the source or only the running app.
