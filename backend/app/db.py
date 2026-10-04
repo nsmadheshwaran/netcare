@@ -10,8 +10,8 @@ class Base(DeclarativeBase):
     pass
 
 
-def make_engine(url: str):
-    kwargs = {"pool_pre_ping": True}
+def make_engine(url: str, **extra):
+    kwargs = {"pool_pre_ping": True, **extra}
     if url.startswith("sqlite"):
         kwargs["connect_args"] = {"check_same_thread": False}
     engine = create_engine(url, **kwargs)

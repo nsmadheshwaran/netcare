@@ -39,16 +39,28 @@ def migrated_template(tmp_path_factory):
     return path
 
 
-def _fresh_engine(tmp_path, template):
+@pytest.fixture(scope="session")
+def pg_engine():
+    """One shared engine and small connection pool for the whole PostgreSQL run, not one per test: creating
+    a fresh pool (5 + 10 overflow connections) per test is what made ~140 tests take many minutes instead of
+    about one, the same as SQLite."""
+    if not PG_URL:
+        yield None
+        return
+    engine = make_engine(PG_URL, pool_size=5, max_overflow=0)
+    yield engine
+    engine.dispose()
+
+
+def _fresh_engine(tmp_path, template, pg_engine):
     if PG_URL:
-        engine = make_engine(PG_URL)
-        with engine.begin() as con:
+        with pg_engine.begin() as con:
             # Fail fast and say so, instead of waiting forever behind a lock a previous test left open.
             con.exec_driver_sql("SET lock_timeout = '15s'")
             tables = [r[0] for r in con.exec_driver_sql(
                 "SELECT tablename FROM pg_tables WHERE schemaname = current_schema() AND tablename <> 'alembic_version'")]
             con.exec_driver_sql(f"TRUNCATE {', '.join(tables)} RESTART IDENTITY CASCADE")
-        return engine
+        return pg_engine
     db_path = tmp_path / "test.db"
     shutil.copyfile(template, db_path)
     return make_engine(f"sqlite:///{db_path}")
@@ -63,9 +75,9 @@ def storage_dir(tmp_path, monkeypatch):
 
 
 @pytest.fixture()
-def client(tmp_path, migrated_template):
+def client(tmp_path, migrated_template, pg_engine):
     """Fresh database per test."""
-    engine = _fresh_engine(tmp_path, migrated_template)
+    engine = _fresh_engine(tmp_path, migrated_template, pg_engine)
     Session = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
     def _db():
@@ -80,7 +92,8 @@ def client(tmp_path, migrated_template):
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()
-    engine.dispose()
+    if not PG_URL:  # the PostgreSQL engine is shared and disposed once, by the pg_engine fixture
+        engine.dispose()
 
 
 class Tenant:
