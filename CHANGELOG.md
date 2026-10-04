@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.1.3 (2026-10-04)
 ### Fixed
 - Dashboard "Stock value (at cost)" showed 0 when cost came from stock-in rather than the product's list purchase price; it now uses the average cost, like the stock valuation report.
 - The SKU and document-prefix input patterns were invalid regular expressions in current browsers, so the browser skipped that validation.
