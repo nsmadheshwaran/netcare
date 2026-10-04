@@ -3,3 +3,17 @@
 *.jpg binary
 *.pdf binary
 *.xlsx binary
+
+# Left out of the customer zip (scripts/make_customer_zip.py): developer and seller-only files.
+.github export-ignore
+backend/tests export-ignore
+backend/pytest.ini export-ignore
+backend/requirements-dev.txt export-ignore
+frontend/e2e export-ignore
+frontend/playwright.config.ts export-ignore
+scripts/make_customer_zip.py export-ignore
+docs/HANDOVER.md export-ignore
+docs/PILOT.md export-ignore
+docs/TESTING.md export-ignore
+docs/ARCHITECTURE.md export-ignore
+docs/INSTALLATION.md export-ignore

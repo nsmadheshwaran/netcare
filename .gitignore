@@ -14,3 +14,4 @@ backend/e2e.db
 
 frontend/*.tsbuildinfo
 commit.html
+release/
