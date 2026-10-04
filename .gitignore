@@ -11,3 +11,6 @@ backend/storage/
 frontend/playwright-report/
 frontend/test-results/
 backend/e2e.db
+
+frontend/*.tsbuildinfo
+commit.html
