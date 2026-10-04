@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.2 (2026-10-04)
+### Fixed
+- Docker: the backend container crashed on start (alembic could not find the app package). First trial run of the compose setup on a PC: build, migrations, register and sign in all work.
+
 ## 1.1.1 (2026-10-04)
 ### Added
 - Email an invoice to the customer (or another address) from the invoice page; credit note PDF; sign-on-tablet approval for service tickets.
