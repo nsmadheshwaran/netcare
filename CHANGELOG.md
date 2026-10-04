@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.0 (2026-10-04)
+### Added
+- Windows install for customers: `install\install.ps1` (random passwords, build, start, daily backup task, optional `-AllowLan`), `scripts\backup.ps1` and `scripts\restore.ps1` (tested with real data, including documents), and [HANDOVER](docs/HANDOVER.md).
+- `NETCARE_PORT` / `NETCARE_BIND` settings so the app can be reached from other PCs on the office network.
+
 ## 1.1.3 (2026-10-04)
 ### Fixed
 - Dashboard "Stock value (at cost)" showed 0 when cost came from stock-in rather than the product's list purchase price; it now uses the average cost, like the stock valuation report.

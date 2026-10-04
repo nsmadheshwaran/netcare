@@ -29,7 +29,8 @@ services:
   web:
     build: ./frontend
     restart: unless-stopped
-    ports: ["127.0.0.1:8080:80"]
+    # NETCARE_BIND=0.0.0.0 lets other PCs on the shop network open the app; the default is this machine only.
+    ports: ["${NETCARE_BIND:-127.0.0.1}:${NETCARE_PORT:-8080}:80"]
     depends_on: [backend]
 
 volumes:

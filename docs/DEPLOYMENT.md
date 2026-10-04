@@ -43,6 +43,12 @@ server {
 ```
 Note: `limit_req_zone` belongs in the `http {}` block.
 
+## Windows PC (Docker Desktop)
+On a Windows PC, run `install\install.ps1` instead of the commands above (see [HANDOVER](HANDOVER.md)). It creates `.env`
+with random passwords, starts NetCare, and schedules `scripts\backup.ps1` daily. `scripts\restore.ps1` restores a
+backup. These are the Windows equivalents of `backup.sh` / `restore.sh`. Set `NETCARE_PORT` / `NETCARE_BIND` in `.env`
+to change the port or let other PCs on the network connect (default: this PC only, port 8080).
+
 ## Backups
 ```bash
 scripts/backup.sh

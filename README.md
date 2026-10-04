@@ -76,7 +76,7 @@ Local dev uses SQLite by default (`netcare_dev.db`). For PostgreSQL, set
 ## Documentation
 
 [Installation](docs/INSTALLATION.md) · [Architecture](docs/ARCHITECTURE.md) · [Database](docs/DATABASE.md) ·
-[API guide](docs/API_GUIDE.md) · [Security](docs/SECURITY.md) · [Deployment](docs/DEPLOYMENT.md) ·
+[API guide](docs/API_GUIDE.md) · [Security](docs/SECURITY.md) · [Deployment](docs/DEPLOYMENT.md) · [Handover (selling to a customer)](docs/HANDOVER.md) ·
 [User guide](docs/USER_GUIDE.md) · [Testing](docs/TESTING.md) · [Troubleshooting](docs/TROUBLESHOOTING.md) ·
 [Monitoring agent](docs/MONITORING_AGENT.md) · [Data organizer](docs/DATA_ORGANIZER.md) · [Changelog](CHANGELOG.md)
 
