@@ -42,6 +42,13 @@ and run `docker compose up -d --build`. Database changes apply automatically on 
 sample data (an older version with an issued invoice, payment and stock upgraded to the current one: the data,
 sign-in and PDFs were intact), but take the backup and keep it until the new version works.
 
+## Demo copy for sales meetings
+Install a separate copy (on another port) and fill it with a fictional business:
+`powershell -ExecutionPolicy Bypass -File .\install\install.ps1 -Port 8090 -NoBackupTask`, then
+`python scripts/seed_demo.py --url http://localhost:8090`. It creates customers, products, stock, invoices (paid,
+partly paid and overdue), a quotation and two service tickets, all through the app so the numbers are real.
+The seed script is not included in the customer zip. Never put real data in the demo.
+
 ## Tell the customer what NetCare is not
 - Not accounting or GST-filing software: the GST summary is a draft for their accountant.
 - No GST e-invoice (IRN) or e-way bill.
