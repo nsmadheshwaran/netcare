@@ -22,7 +22,7 @@ test("a new business registers and sees the Get started checklist", async ({ pag
 
 test("add a customer and find it in the list", async ({ page }) => {
   await register(page, "E2E Customers Shop");
-  await page.getByRole("link", { name: "Customers" }).click();
+  await page.getByRole("link", { name: "Customers", exact: true }).click();
   await page.getByRole("button", { name: "Add customer" }).click();
   const dialog = page.getByRole("dialog", { name: "Add customer" });
   await dialog.getByLabel("Name *", { exact: true }).fill("Govt Higher Secondary School");
