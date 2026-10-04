@@ -80,8 +80,11 @@ def client(tmp_path, migrated_template, pg_engine):
     engine = _fresh_engine(tmp_path, migrated_template, pg_engine)
     Session = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
+    opened = []  # tests may open sessions directly and forget to close them; PostgreSQL would then block TRUNCATE
+
     def _db():
         db = Session()
+        opened.append(db)
         try:
             yield db
         finally:
@@ -92,6 +95,8 @@ def client(tmp_path, migrated_template, pg_engine):
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()
+    for db in opened:
+        db.close()
     if not PG_URL:  # the PostgreSQL engine is shared and disposed once, by the pg_engine fixture
         engine.dispose()
 
