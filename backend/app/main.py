@@ -40,7 +40,7 @@ async def lifespan(_app: FastAPI):
     stop.set()
 
 
-app = FastAPI(title="NetCare Business Suite API", version="1.1.0", lifespan=lifespan,
+app = FastAPI(title="NetCare Business Suite API", version="1.1.1", lifespan=lifespan,
               description="API v1. Send `Authorization: Bearer <token>` and `X-Organization-ID` headers.")
 app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origin_list, allow_credentials=False,
                    allow_methods=["*"], allow_headers=["Authorization", "Content-Type", "X-Organization-ID"])

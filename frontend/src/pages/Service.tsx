@@ -135,17 +135,19 @@ function SignaturePad({ ticketId, onDone }: { ticketId: number; onDone: () => vo
   const [hasDraw, setHasDraw] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const startDraw = (e: any) => { setDrawing(true); draw(e); };
-  const stopDraw = () => setDrawing(false);
-  const draw = (e: any) => {
-    if (!drawing) return;
+  const canvas = () => document.getElementById("sig-canvas") as HTMLCanvasElement | null;
+  const startDraw = (e: any) => { setDrawing(true); drawAt(e, true); };
+  const stopDraw = () => { setDrawing(false); canvas()?.getContext("2d")?.beginPath(); };
+  const draw = (e: any) => drawAt(e, false);
+  const drawAt = (e: any, force: boolean) => {
+    if (!drawing && !force) return;
     const canvas = document.getElementById("sig-canvas") as HTMLCanvasElement;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     const rect = canvas.getBoundingClientRect();
-    const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
-    const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+    const x = ((e.touches ? e.touches[0].clientX : e.clientX) - rect.left) * (canvas.width / rect.width);
+    const y = ((e.touches ? e.touches[0].clientY : e.clientY) - rect.top) * (canvas.height / rect.height);
     ctx.lineWidth = 2;
     ctx.lineCap = "round";
     ctx.strokeStyle = "#0f172a";
@@ -166,12 +168,11 @@ function SignaturePad({ ticketId, onDone }: { ticketId: number; onDone: () => vo
 
   async function save() {
     if (!name.trim()) { setError("Customer name is required"); return; }
-    const canvas = document.getElementById("sig-canvas") as HTMLCanvasElement;
-    const sigData = hasDraw && canvas ? canvas.toDataURL("image/png") : null;
+    if (!hasDraw) { setError("Please sign in the box first"); return; }
     try {
       await api(`/service-tickets/${ticketId}/approval`, {
         method: "POST",
-        json: { decision: "approved", note: `Signed by ${name.trim()}${sigData ? " (digital signature recorded)" : ""}` },
+        json: { decision: "approved", note: `Signed on screen by ${name.trim()} (signature image is not stored)` },
       });
       onDone();
     } catch (err: any) { setError(err.message); }

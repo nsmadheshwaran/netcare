@@ -2,6 +2,7 @@ from datetime import date
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import EmailStr, TypeAdapter, ValidationError
 from sqlalchemy import func, or_, select
 
 from ..deps import OrgContext, require
@@ -281,11 +282,17 @@ def cancel_invoice(inv_id: int, body: CancelIn, ctx: OrgContext = Depends(requir
 
 
 @router.post("/invoices/{inv_id}/email")
-def email_invoice(inv_id: int, ctx: OrgContext = Depends(require("sales.view")), email: str | None = Query(None)):
-    """Queue invoice email to customer or specified recipient."""
+def email_invoice(inv_id: int, ctx: OrgContext = Depends(require("sales.edit")), email: str | None = Query(None)):
+    """Queue invoice email to the customer, or to another address the sender types."""
     inv = get_owned(ctx, SalesInvoice, inv_id, "Invoice")
+    if inv.status in ("draft", "cancelled"):
+        raise HTTPException(422, f"A {inv.status} invoice cannot be emailed")
     customer = active_customer(ctx, inv.customer_id)
     target_email = email or customer.email
+    try:
+        target_email = TypeAdapter(EmailStr).validate_python(target_email) if target_email else None
+    except ValidationError:
+        raise HTTPException(422, "That is not a valid email address")
     if not target_email:
         raise HTTPException(422, "Customer has no email address configured")
     from ..services.notify import email_configured

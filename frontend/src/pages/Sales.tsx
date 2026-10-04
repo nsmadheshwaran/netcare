@@ -214,7 +214,7 @@ function InvoiceDetail({ id, onChanged, onClose }: { id: number; onChanged: () =
         </>}
       </TotalsBox>
       {!!credits.data?.items.length && <div className="text-sm"><div className="font-medium">Credit notes</div>
-        {credits.data.items.map((c) => <div key={c.id} className="flex items-center justify-between text-slate-600 dark:text-slate-300"><span>{c.number} · {c.note_date} · {inr(c.total)} · {c.reason}{c.restock ? " · restocked" : ""}</span><button className="btn-ghost !px-2 !py-0.5 text-xs" onClick={() => openPdf(`/documents/credit-notes/${c.id}/pdf`)}><Printer size={12} /> PDF</button></div>)}</div>}
+        {credits.data.items.map((c) => <div key={c.id} className="flex items-center justify-between text-slate-600 dark:text-slate-300"><span>{c.number} · {c.note_date} · {inr(c.total)} · {c.reason}{c.restock ? " · restocked" : ""}</span><button className="btn-ghost !px-2 !py-0.5 text-xs" onClick={() => openPdf(`/credit-notes/${c.id}/pdf`)}><Printer size={12} /> PDF</button></div>)}</div>}
 
       {inv.terms && <div className="whitespace-pre-line text-xs text-slate-500">{inv.terms}</div>}
       <div className="text-right"><button className="btn-ghost" onClick={onClose}>Close</button></div>

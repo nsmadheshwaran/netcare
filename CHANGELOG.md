@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.1.1 (2026-10-04)
+### Added
+- Email an invoice to the customer (or another address) from the invoice page; credit note PDF; sign-on-tablet approval for service tickets.
+### Fixed
+- Email invoice now needs edit permission, validates the address and refuses draft/cancelled invoices.
+- Credit note PDF button called the wrong URL.
+- Signature pad no longer claims the signature was stored (the image is not saved; the approval note says so), and strokes/scaling are correct.
+- Tests close leaked database sessions (PostgreSQL CI failure). 144 backend tests.
+
 ## 1.1.0 (2026-10-04)
 ### Added
 - Stay signed in: rotating refresh tokens (30 days), silent renewal in the app, reuse detection; sign out ends
