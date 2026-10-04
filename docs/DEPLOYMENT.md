@@ -1,7 +1,6 @@
 # Deployment
 
-> The Docker configuration is written but **has not been run** in the development environment, because Docker
-> is not installed there. Do a full trial deployment on a staging server before putting real data in it.
+> The Docker configuration was trial-run once on a PC (build, migrations, register and sign in all worked), but not on a real server. Do a trial deployment on a staging server before real data.
 
 ## Single server with Docker Compose
 ```bash
