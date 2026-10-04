@@ -418,3 +418,64 @@ def payment_receipt_pdf(org, payment, party_name: str, allocations: list[tuple[s
               Spacer(1, 3 * mm), Paragraph("This is a computer-generated document.", st["small"])]
     pdf.build(story)
     return buf.getvalue()
+
+
+def credit_note_pdf(org, cn, invoice_number: str, customer) -> bytes:
+    """Printable A4 Credit Note PDF."""
+    st = _styles()
+    buf = io.BytesIO()
+    pdf = SimpleDocTemplate(buf, pagesize=A4, leftMargin=12 * mm, rightMargin=12 * mm, topMargin=10 * mm,
+                            bottomMargin=12 * mm, title=f"Credit Note {cn.number}", author=org.name)
+    title = "CREDIT NOTE"
+    meta = [("Credit Note no.", cn.number), ("Date", cn.note_date.strftime("%d-%m-%Y")),
+            ("Against invoice", invoice_number), ("Reason", cn.reason)]
+    logo = _logo(org)
+    left = ([logo] if logo else []) + _org_block(org, st)
+    right = [Paragraph(title, st["title"])] + [
+        Paragraph(f"{esc(k)}: <b>{esc(str(v))}</b>", st["right"]) for k, v in meta]
+    story = [Table([[left, right]], colWidths=[110 * mm, 76 * mm],
+                   style=[("VALIGN", (0, 0), (-1, -1), "TOP")]), Spacer(1, 4 * mm)]
+
+    bill_to = [Paragraph("<b>Issued to</b>", st["small"]), _p(customer.business_name or customer.name, st["bold"])]
+    if customer.business_name and customer.name != customer.business_name:
+        bill_to.append(_p(customer.name, st["base"]))
+    for x in (customer.billing_address, ", ".join(p for p in (customer.city, customer.state, customer.pincode) if p),
+              customer.phone):
+        if x:
+            bill_to.append(_p(x, st["base"]))
+    if customer.gstin:
+        bill_to.append(_p(f"GSTIN: {customer.gstin}", st["bold"]))
+    story.append(Table([[bill_to]], colWidths=[186 * mm],
+                       style=[("BOX", (0, 0), (-1, -1), 0.4, colors.HexColor("#94a3b8")),
+                              ("VALIGN", (0, 0), (-1, -1), "TOP")]))
+    story.append(Spacer(1, 4 * mm))
+
+    head = ["#", "Item / Description", "Taxable Value", "Tax Amount", "Total Credited"]
+    rows = [[Paragraph(f"<b>{h}</b>", st["small"]) for h in head]]
+    for n, li in enumerate(cn.lines, start=1):
+        desc = getattr(li, "description", None) or f"Credited line #{li.sales_invoice_line_id}"
+        rows.append([str(n), _p(desc, st["small"]), inr(li.taxable_value), inr(li.tax_amount), inr(li.amount)])
+    t = Table(rows, colWidths=[10 * mm, 96 * mm, 26 * mm, 26 * mm, 28 * mm], repeatRows=1)
+    t.setStyle(TableStyle([("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#cbd5e1")),
+                           ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e0e7ff")),
+                           ("FONTSIZE", (0, 1), (-1, -1), 7.5), ("ALIGN", (2, 1), (-1, -1), "RIGHT"),
+                           ("VALIGN", (0, 0), (-1, -1), "TOP")]))
+    story += [t, Spacer(1, 3 * mm)]
+
+    tot = [("Taxable total", cn.taxable_total), ("Tax total", cn.tax_total), ("Total Credit", cn.total)]
+    tot_rows = [[Paragraph(f"<b>{esc(k)}</b>" if k == "Total Credit" else esc(k), st["base"]),
+                 Paragraph(f"<b>{inr(v)}</b>" if k == "Total Credit" else inr(v), st["right"])]
+                for k, v in tot]
+    totals = Table(tot_rows, colWidths=[38 * mm, 32 * mm],
+                   style=[("LINEABOVE", (0, len(tot_rows) - 1), (-1, len(tot_rows) - 1), 0.4, colors.black)])
+    words = [Paragraph("<b>Amount in words</b>", st["small"]), _p(amount_in_words(cn.total), st["base"])]
+    story.append(Table([[words, totals]], colWidths=[116 * mm, 70 * mm], style=[("VALIGN", (0, 0), (-1, -1), "TOP")]))
+
+    story += [Spacer(1, 10 * mm),
+              Table([["", Paragraph(f"For <b>{esc(org.name)}</b><br/><br/><br/>Authorised signatory", st["right"])]],
+                    colWidths=[116 * mm, 70 * mm]),
+              Spacer(1, 4 * mm),
+              Paragraph("This is a computer-generated document.", st["small"])]
+    pdf.build(story)
+    return buf.getvalue()
+

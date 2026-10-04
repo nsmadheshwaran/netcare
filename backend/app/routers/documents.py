@@ -40,6 +40,16 @@ def quotation_pdf(qid: int, ctx: OrgContext = Depends(require("sales.view")), do
                 q.number, download)
 
 
+@router.get("/credit-notes/{cn_id}/pdf")
+def credit_note_pdf(cn_id: int, ctx: OrgContext = Depends(require("sales.view")), download: bool = False):
+    from ..models_trade import CreditNote
+    cn = get_owned(ctx, CreditNote, cn_id, "Credit note")
+    inv = ctx.db.get(SalesInvoice, cn.sales_invoice_id)
+    cust = ctx.db.get(Customer, cn.customer_id)
+    return _pdf(pdf_docs.credit_note_pdf(ctx.org, cn, inv.number or f"#{inv.id}", cust), cn.number, download)
+
+
+
 @router.get("/payments/{payment_id}/pdf")
 def payment_pdf(payment_id: int, ctx: OrgContext = Depends(require("payments.view")), download: bool = False):
     p = get_owned(ctx, Payment, payment_id, "Payment")

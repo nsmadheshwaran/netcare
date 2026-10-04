@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { Ban, CheckCircle2, FileInput, IndianRupee, Plus, Printer, Receipt, Send, Undo2 } from "lucide-react";
+import { Ban, CheckCircle2, FileInput, IndianRupee, Mail, Plus, Printer, Receipt, Send, Undo2 } from "lucide-react";
 import { api, inr, openPdf, qty, type Page } from "../api";
 import { useAuth } from "../auth";
 import {
@@ -154,7 +154,16 @@ function InvoiceDetail({ id, onChanged, onClose }: { id: number; onChanged: () =
   const credits = useAsync(() => api<Page<any>>(`/credit-notes?invoice_id=${id}`), [id]);
   const [mode, setMode] = useState<"view" | "edit" | "pay" | "credit">("view");
   const [err, setErr] = useState<string | null>(null);
+  const [emailMsg, setEmailMsg] = useState<string | null>(null);
   const refresh = () => { setMode("view"); reload(); credits.reload(); onChanged(); };
+
+  async function sendEmail() {
+    setErr(null); setEmailMsg(null);
+    try {
+      const r = await api<{ queued_to: string }>(`/invoices/${id}/email`, { method: "POST" });
+      setEmailMsg(`Invoice email queued to ${r.queued_to}.`);
+    } catch (e: any) { setErr(e.message); }
+  }
 
   async function act(path: string, confirmMsg: string, body?: unknown) {
     if (!confirmAction(confirmMsg)) return;
@@ -174,6 +183,7 @@ function InvoiceDetail({ id, onChanged, onClose }: { id: number; onChanged: () =
   return (
     <div className="space-y-4">
       <ErrorBanner message={err} />
+      {emailMsg && <div className="rounded bg-emerald-50 p-2 text-sm text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">{emailMsg}</div>}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="text-lg font-semibold">{inv.number ?? "Draft invoice"} <StatusBadge s={inv.display_status} /></div>
@@ -183,6 +193,7 @@ function InvoiceDetail({ id, onChanged, onClose }: { id: number; onChanged: () =
         <div className="flex flex-wrap gap-2">
           <button className="btn-ghost" onClick={() => openPdf(`/invoices/${inv.id}/pdf`).catch((e) => setErr(e.message))}><Printer size={15} /> {inv.status === "draft" ? "Preview" : "Print A4"}</button>
           {inv.status !== "draft" && <button className="btn-ghost" onClick={() => openPdf(`/invoices/${inv.id}/pdf?layout=thermal`).catch((e) => setErr(e.message))}><Receipt size={15} /> Thermal</button>}
+          {inv.status !== "draft" && <button className="btn-ghost" onClick={sendEmail}><Mail size={15} /> Email</button>}
         </div>
         {can("sales.edit") && <div className="flex flex-wrap gap-2">
           {inv.status === "draft" && <>
@@ -203,7 +214,8 @@ function InvoiceDetail({ id, onChanged, onClose }: { id: number; onChanged: () =
         </>}
       </TotalsBox>
       {!!credits.data?.items.length && <div className="text-sm"><div className="font-medium">Credit notes</div>
-        {credits.data.items.map((c) => <div key={c.id} className="text-slate-600 dark:text-slate-300">{c.number} · {c.note_date} · {inr(c.total)} · {c.reason}{c.restock ? " · restocked" : ""}</div>)}</div>}
+        {credits.data.items.map((c) => <div key={c.id} className="flex items-center justify-between text-slate-600 dark:text-slate-300"><span>{c.number} · {c.note_date} · {inr(c.total)} · {c.reason}{c.restock ? " · restocked" : ""}</span><button className="btn-ghost !px-2 !py-0.5 text-xs" onClick={() => openPdf(`/documents/credit-notes/${c.id}/pdf`)}><Printer size={12} /> PDF</button></div>)}</div>}
+
       {inv.terms && <div className="whitespace-pre-line text-xs text-slate-500">{inv.terms}</div>}
       <div className="text-right"><button className="btn-ghost" onClick={onClose}>Close</button></div>
     </div>

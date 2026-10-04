@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { CalendarClock, CheckCircle2, MessageSquare, Package, Plus, Printer, Receipt, Undo2, Wrench, XCircle } from "lucide-react";
+import { CalendarClock, CheckCircle2, FileSignature, MessageSquare, Package, Plus, Printer, Receipt, Undo2, Wrench, XCircle } from "lucide-react";
 import { api, inr, openPdf, qty, type Page } from "../api";
 import { useAuth } from "../auth";
 import { PartySelect, today, useCustomers, useLocations, useProducts } from "../components/trade";
@@ -129,6 +129,76 @@ function RegisterAssets({ t, onDone }: { t: Ticket; onDone: () => void }) {
   );
 }
 
+function SignaturePad({ ticketId, onDone }: { ticketId: number; onDone: () => void }) {
+  const [name, setName] = useState("");
+  const [drawing, setDrawing] = useState(false);
+  const [hasDraw, setHasDraw] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const startDraw = (e: any) => { setDrawing(true); draw(e); };
+  const stopDraw = () => setDrawing(false);
+  const draw = (e: any) => {
+    if (!drawing) return;
+    const canvas = document.getElementById("sig-canvas") as HTMLCanvasElement;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+    const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    ctx.strokeStyle = "#0f172a";
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    setHasDraw(true);
+  };
+  const clear = () => {
+    const canvas = document.getElementById("sig-canvas") as HTMLCanvasElement;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    ctx?.clearRect(0, 0, canvas.width, canvas.height);
+    ctx?.beginPath();
+    setHasDraw(false);
+  };
+
+  async function save() {
+    if (!name.trim()) { setError("Customer name is required"); return; }
+    const canvas = document.getElementById("sig-canvas") as HTMLCanvasElement;
+    const sigData = hasDraw && canvas ? canvas.toDataURL("image/png") : null;
+    try {
+      await api(`/service-tickets/${ticketId}/approval`, {
+        method: "POST",
+        json: { decision: "approved", note: `Signed by ${name.trim()}${sigData ? " (digital signature recorded)" : ""}` },
+      });
+      onDone();
+    } catch (err: any) { setError(err.message); }
+  }
+
+  return (
+    <div className="space-y-3">
+      <ErrorBanner message={error} />
+      <Field label="Customer Full Name *"><input className="input" required value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Ramesh Kumar" /></Field>
+      <Field label="Sign on touchscreen / tablet below">
+        <div className="rounded border border-slate-300 bg-white dark:border-slate-700">
+          <canvas id="sig-canvas" width={400} height={150} className="w-full touch-none" onMouseDown={startDraw} onMouseUp={stopDraw} onMouseMove={draw} onTouchStart={startDraw} onTouchEnd={stopDraw} onTouchMove={draw} />
+        </div>
+      </Field>
+      <div className="flex justify-between">
+        <button type="button" className="btn-ghost !py-1 text-xs" onClick={clear}>Clear canvas</button>
+        <div className="flex gap-2">
+          <button type="button" className="btn-ghost" onClick={onDone}>Cancel</button>
+          <button className="btn-primary" onClick={save}>Save signature & approve</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+
 export function TicketDetail({ id, onChanged }: { id: number; onChanged?: () => void }) {
   const { can } = useAuth();
   const { data: t, error, reload } = useAsync(() => api<Ticket>(`/service-tickets/${id}`), [id]);
@@ -139,7 +209,7 @@ export function TicketDetail({ id, onChanged }: { id: number; onChanged?: () => 
   const [edit, setEdit] = useState<any>(null);
   const [part, setPart] = useState({ product_id: "", quantity: "1" });
   const [note, setNote] = useState("");
-  const [mode, setMode] = useState<"view" | "assets">("view");
+  const [mode, setMode] = useState<"view" | "assets" | "sig">("view");
   const office = can("service.edit");
 
   async function run(fn: () => Promise<unknown>) {
@@ -150,6 +220,7 @@ export function TicketDetail({ id, onChanged }: { id: number; onChanged?: () => 
 
   if (!t) return error ? <ErrorBanner message={error} /> : <Spinner />;
   if (mode === "assets") return <RegisterAssets t={t} onDone={() => { setMode("view"); reload(); }} />;
+  if (mode === "sig") return <SignaturePad ticketId={t.id} onDone={() => { setMode("view"); reload(); onChanged?.(); }} />;
   const open = !["closed", "cancelled"].includes(t.status);
   const form = edit ?? { diagnosis: t.diagnosis ?? "", work_performed: t.work_performed ?? "", resolution: t.resolution ?? "", labour_charge: t.labour_charge, estimate_amount: t.estimate_amount ?? "", scheduled_visit: toLocalInput(t.scheduled_visit) };
   const dirty = edit !== null;
@@ -194,8 +265,9 @@ export function TicketDetail({ id, onChanged }: { id: number; onChanged?: () => 
         </div>
         <div className="card !p-3"><div className="text-xs text-slate-500">Estimate / approval</div>
           <div className="font-medium">{t.estimate_amount ? inr(t.estimate_amount) : "No estimate"} {t.customer_approval !== "not_required" && <Badge tone={t.customer_approval === "approved" ? "green" : t.customer_approval === "pending" ? "amber" : "red"}>{t.customer_approval}</Badge>}</div>
-          {t.customer_approval === "pending" && <div className="mt-1 flex gap-2">
-            <button className="btn-ghost !py-1 text-xs" onClick={() => { const n = window.prompt("How was it approved? (e.g. by phone, spoke to Mr. Ravi)"); if (n !== null) post("/approval", { decision: "approved", note: n || null }); }}>Customer approved</button>
+          {t.customer_approval === "pending" && <div className="mt-1 flex flex-wrap gap-2">
+            <button className="btn-ghost !py-1 text-xs" onClick={() => { const n = window.prompt("How was it approved? (e.g. by phone, spoke to Mr. Ravi)"); if (n !== null) post("/approval", { decision: "approved", note: n || null }); }}>Approved</button>
+            <button className="btn-primary !py-1 text-xs" onClick={() => setMode("sig")}><FileSignature size={13} /> Sign on tablet</button>
             <button className="btn-ghost !py-1 text-xs text-red-600" onClick={() => post("/approval", { decision: "declined" })}>Declined</button></div>}
           {t.approval_note && <div className="text-xs text-slate-500">{t.approval_note}</div>}
         </div>

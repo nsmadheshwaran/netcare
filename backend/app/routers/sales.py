@@ -280,7 +280,34 @@ def cancel_invoice(inv_id: int, body: CancelIn, ctx: OrgContext = Depends(requir
     return _inv_out(ctx, inv)
 
 
+@router.post("/invoices/{inv_id}/email")
+def email_invoice(inv_id: int, ctx: OrgContext = Depends(require("sales.view")), email: str | None = Query(None)):
+    """Queue invoice email to customer or specified recipient."""
+    inv = get_owned(ctx, SalesInvoice, inv_id, "Invoice")
+    customer = active_customer(ctx, inv.customer_id)
+    target_email = email or customer.email
+    if not target_email:
+        raise HTTPException(422, "Customer has no email address configured")
+    from ..services.notify import email_configured
+    if not email_configured():
+        raise HTTPException(422, "SMTP is not configured on this server")
+    from ..models_notify import EmailOutbox
+    subject = f"Invoice {inv.number or f'#{inv.id}'} from {ctx.org.name}"
+    body = f"Dear {customer.name},\n\nPlease find details of your invoice below:\n" \
+           f"Invoice Number: {inv.number or f'#{inv.id}'}\n" \
+           f"Date: {inv.invoice_date}\n" \
+           f"Total Amount: Rs {inv.total}\n" \
+           f"Balance Due: Rs {balance(inv)}\n\n" \
+           f"Thank you for your business!\n{ctx.org.name}"
+    ctx.db.add(EmailOutbox(organization_id=ctx.org_id, channel="email", to_address=target_email,
+                           subject=subject, body=body))
+    ctx.audit("email", "sales_invoice", inv.id, {"to": target_email})
+    ctx.db.commit()
+    return {"queued_to": target_email}
+
+
 # ---------------- credit notes ----------------
+
 @router.post("/invoices/{inv_id}/credit-notes", response_model=CreditNoteOut, status_code=201)
 def create_credit_note(inv_id: int, body: CreditNoteIn, ctx: OrgContext = Depends(require("sales.edit"))):
     if body.idempotency_key:
