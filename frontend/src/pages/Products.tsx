@@ -55,7 +55,7 @@ function ProductForm({ initial, categories, onDone, onCategory }: { initial: Par
       <ErrorBanner message={error} />
       <div className="grid gap-3 sm:grid-cols-3">
         {input("name", "Name *", { required: true })}
-        {input("sku", "SKU *", { required: true, pattern: "[A-Za-z0-9._\\-/]+" })}
+        {input("sku", "SKU *", { required: true, pattern: "[A-Za-z0-9._\\-\\/]+" })}
         <Field label="Category">
           <select className="input" value={f.category_id ?? ""} onChange={set("category_id")}>
             <option value="">— none —</option>

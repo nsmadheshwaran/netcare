@@ -52,11 +52,13 @@ def summary(ctx: OrgContext = Depends(require("dashboard.view")),
     lvl = lvl.group_by(StockLevel.product_id).subquery()
     qty = func.coalesce(lvl.c.qty, 0)
     goods = (select(Product.id, Product.name, Product.sku, Product.min_stock, Product.purchase_price,
-                    qty.label("qty"))
+                    Product.avg_cost, qty.label("qty"))
              .outerjoin(lvl, lvl.c.product_id == Product.id)
              .where(Product.organization_id == org, Product.archived_at.is_(None), Product.is_service.is_(False)))
     rows = db.execute(goods).all()
-    valuation = sum((Decimal(r.qty) * Decimal(r.purchase_price) for r in rows), Decimal("0"))
+    # Same basis as the stock valuation report: the average cost recorded on stock-in, else the list purchase price.
+    valuation = sum((Decimal(r.qty) * Decimal(r.avg_cost or r.purchase_price)
+                     for r in rows), Decimal("0"))
     low = [r for r in rows if Decimal(r.qty) <= Decimal(r.min_stock)]
 
     mv = select(StockMovement.movement_type, func.sum(StockMovement.quantity_change)).where(

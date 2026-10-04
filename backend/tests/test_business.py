@@ -157,3 +157,13 @@ def test_timestamps_are_utc_aware(tenant):
     assert c["created_at"].endswith(("Z", "+00:00"))
     d = tenant.get("/api/v1/dashboard/summary").json()
     assert d["recent_activity"][0]["at"].endswith("+00:00")
+
+
+def test_dashboard_stock_value_uses_recorded_cost(tenant):
+    loc = tenant.get("/api/v1/organization/locations").json()[0]["id"]
+    p = tenant.post("/api/v1/products", json={"name": "Camera", "sku": "CAM-9", "selling_price": "1500"}).json()
+    tenant.post("/api/v1/inventory/movements", json={"product_id": p["id"], "location_id": loc,
+                                                     "movement_type": "stock_in", "quantity": "10",
+                                                     "unit_cost": "1000"})
+    d = tenant.get("/api/v1/dashboard/summary").json()
+    assert d["inventory"]["stock_valuation_at_cost"] == "10000.00"  # list purchase price is 0, cost came from stock-in

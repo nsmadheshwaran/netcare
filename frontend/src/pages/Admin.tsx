@@ -249,7 +249,7 @@ export function Settings() {
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" disabled={!editable} checked={!!form.prices_include_tax_default} onChange={(e) => setF({ ...form, prices_include_tax_default: e.target.checked })} /> Prices I enter include GST (MRP-style). Can be changed per invoice.</label>
           <div className="grid gap-3 sm:grid-cols-3">
             {[["sales_invoice", "Invoice prefix", "INV"], ["quotation", "Quotation prefix", "QT"], ["purchase_order", "PO prefix", "PO"]].map(([k, label, def]) => (
-              <Field key={k} label={label}><input className="input" disabled={!editable} maxLength={12} pattern="[A-Za-z0-9-]+" placeholder={def}
+              <Field key={k} label={label}><input className="input" disabled={!editable} maxLength={12} pattern="[A-Za-z0-9\-]+" placeholder={def}
                 value={form.numbering_prefixes?.[k] ?? ""} onChange={(e) => {
                   const p = { ...(form.numbering_prefixes ?? {}) };
                   if (e.target.value) p[k] = e.target.value; else delete p[k];
