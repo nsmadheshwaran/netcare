@@ -92,6 +92,15 @@ document never changes if a product price or tax rate changes later.
 | notification_prefs | Per user, business and kind: in app on/off, email on/off |
 | email_outbox | Queued emails: status pending/sent/failed, attempts, next attempt, last error |
 
+### Migrations `0009` to `0011` (1.1.0)
+| Table / column | Purpose |
+|---|---|
+| refresh_tokens | Hashed refresh tokens, family per sign-in, rotation (`used_at`), revocation, expiry, IP and browser |
+| user_tokens | Hashed single-use invite/reset links with expiry |
+| email_outbox.organization_id nullable; email_outbox.channel | Account emails without a business; email / sms / whatsapp |
+| monitor_checks.snmp_community, snmp_oids, last_values; check_results.values | SNMP checks and readings |
+| users.phone; notification_prefs.sms | Text-message alerts |
+
 The file bytes are not in the database; they are in `NETCARE_STORAGE_DIR`. Back up both.
 
 Every business table has an `organization_id` column with `ON DELETE CASCADE` to its organization.

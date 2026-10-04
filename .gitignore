@@ -8,3 +8,6 @@ frontend/dist/
 backend/DEV_SEED.md
 backups/
 backend/storage/
+frontend/playwright-report/
+frontend/test-results/
+backend/e2e.db

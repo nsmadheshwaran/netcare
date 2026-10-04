@@ -14,10 +14,16 @@ export function Users() {
   const [adding, setAdding] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [f, setF] = useState({ email: "", full_name: "", role: "salesperson", temporary_password: "" });
+  const emailEnabled = useAsync(() => api<{ email_enabled: boolean }>("/auth/config"), []).data?.email_enabled ?? false;
 
   async function update(m: Member, body: Partial<Member>) {
     setActionError(null);
     try { await api(`/organization/members/${m.id}`, { method: "PATCH", json: body }); reload(); }
+    catch (err: any) { setActionError(err.message); }
+  }
+  async function sendInvite(m: Member) {
+    setActionError(null);
+    try { const r = await api<{ sent_to: string }>(`/organization/members/${m.id}/send-invite`, { method: "POST" }); window.alert(`Link emailed to ${r.sent_to}.`); }
     catch (err: any) { setActionError(err.message); }
   }
   async function resetPassword(m: Member) {
@@ -30,7 +36,7 @@ export function Users() {
   async function add(e: FormEvent) {
     e.preventDefault();
     setActionError(null);
-    try { await api("/organization/members", { method: "POST", json: f }); setAdding(false); reload(); }
+    try { await api("/organization/members", { method: "POST", json: { ...f, temporary_password: f.temporary_password || null } }); setAdding(false); reload(); }
     catch (err: any) { setActionError(err.message); }
   }
 
@@ -55,6 +61,7 @@ export function Users() {
                   {m.email === me?.user.email ? <Badge tone="indigo">you</Badge> : (
                     <span className="flex gap-1">
                       <button className="btn-ghost !py-1 text-xs" onClick={() => update(m, { is_active: !m.is_active })}>{m.is_active ? "Deactivate" : "Reactivate"}</button>
+                      {emailEnabled && <button className="btn-ghost !py-1 text-xs" title="Email a link to choose a password" onClick={() => sendInvite(m)}>Email link</button>}
                       <button className="btn-ghost !py-1 text-xs" onClick={() => resetPassword(m)}>Reset password</button>
                     </span>
                   )}
@@ -69,8 +76,11 @@ export function Users() {
           <Field label="Full name"><input className="input" required value={f.full_name} onChange={(e) => setF({ ...f, full_name: e.target.value })} /></Field>
           <Field label="Email"><input className="input" type="email" required value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} /></Field>
           <Field label="Role"><select className="input" value={f.role} onChange={(e) => setF({ ...f, role: e.target.value })}>{ROLES.map((r) => <option key={r} value={r}>{r.replace("_", " ")}</option>)}</select></Field>
-          <Field label="Temporary password (min 10 characters)"><input className="input" type="password" required minLength={10} autoComplete="new-password" value={f.temporary_password} onChange={(e) => setF({ ...f, temporary_password: e.target.value })} /></Field>
-          <p className="text-xs text-slate-500">Share the temporary password privately; ask the user to change it after first sign-in. If the email already has an account, their existing password is kept.</p>
+          <Field label={emailEnabled ? "Temporary password (optional)" : "Temporary password (min 10 characters)"}><input className="input" type="password" required={!emailEnabled} minLength={10} autoComplete="new-password" value={f.temporary_password} onChange={(e) => setF({ ...f, temporary_password: e.target.value })} /></Field>
+          <p className="text-xs text-slate-500">{emailEnabled
+            ? "Leave the password empty to email them an invitation link to choose their own. "
+            : "Share the temporary password privately; ask the user to change it after first sign-in. "}
+            If the email already has an account, their existing password is kept.</p>
           <div className="flex justify-end gap-2"><button type="button" className="btn-ghost" onClick={() => setAdding(false)}>Cancel</button><button className="btn-primary">Add</button></div>
         </form>
       </Modal>}

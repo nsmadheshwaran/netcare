@@ -6,7 +6,7 @@ import { useAuth } from "../auth";
 import { Badge, Empty, ErrorBanner, PageHeader, Pager, Spinner, useAsync } from "../components/ui";
 
 type N = { id: number; kind: string; severity: "info" | "warning" | "critical" | "success"; title: string; body: string | null; link: string | null; created_at: string; read_at: string | null };
-type Prefs = { email_configured: boolean; email_address: string; kinds: { kind: string; label: string; in_app: boolean; email: boolean }[] };
+type Prefs = { email_configured: boolean; email_address: string; sms_configured: boolean; sms_channel: string; phone: string | null; kinds: { kind: string; label: string; in_app: boolean; email: boolean; sms: boolean; sms_allowed: boolean }[] };
 const DOT: Record<string, string> = { critical: "bg-red-500", warning: "bg-amber-500", success: "bg-emerald-500", info: "bg-indigo-500" };
 const ago = (iso: string) => {
   const s = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
@@ -38,9 +38,12 @@ function Preferences() {
   const { data, error, reload } = useAsync(() => api<Prefs>("/notifications/preferences"), []);
   const [err, setErr] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [phone, setPhone] = useState<string | null>(null);
   if (error) return <ErrorBanner message={error} />;
   if (!data) return <Spinner />;
-  const save = (kind: string, patch: { in_app?: boolean; email?: boolean }) => {
+  const textLabel = data.sms_channel === "whatsapp" ? "WhatsApp" : "SMS";
+  const savePhone = () => api("/notifications/phone", { method: "PUT", json: { phone: phone ?? data.phone } }).then(() => { setPhone(null); reload(); setMsg("Mobile number saved."); }).catch((e) => setErr(e.message));
+  const save = (kind: string, patch: { in_app?: boolean; email?: boolean; sms?: boolean }) => {
     const k = data.kinds.find((x) => x.kind === kind)!;
     api("/notifications/preferences", { method: "PUT", json: [{ ...k, ...patch }] }).then(reload).catch((e) => setErr(e.message));
   };
@@ -50,17 +53,27 @@ function Preferences() {
       <h2 className="mb-1 font-semibold">What to tell me</h2>
       <p className="mb-3 text-sm text-slate-500">{data.email_configured ? <>Emails go to <b>{data.email_address}</b>.</> : "Email is not set up on this server, so only in-app notifications are delivered. Your administrator can configure it (see the notifications guide)."}</p>
       <table className="w-full text-sm">
-        <thead><tr><th className="th">Notification</th><th className="th text-center">In app</th><th className="th text-center">Email</th></tr></thead>
+        <thead><tr><th className="th">Notification</th><th className="th text-center">In app</th><th className="th text-center">Email</th>{data.sms_configured && <th className="th text-center">{textLabel}</th>}</tr></thead>
         <tbody>{data.kinds.map((k) => (
           <tr key={k.kind} className="border-t border-slate-100 dark:border-slate-800">
             <td className="td">{k.label}</td>
             <td className="td text-center"><input type="checkbox" aria-label={`${k.label}: in app`} checked={k.in_app} onChange={(e) => save(k.kind, { in_app: e.target.checked })} /></td>
             <td className="td text-center"><input type="checkbox" aria-label={`${k.label}: email`} checked={k.email} disabled={!data.email_configured} onChange={(e) => save(k.kind, { email: e.target.checked })} /></td>
+            {data.sms_configured && <td className="td text-center">{k.sms_allowed
+              ? <input type="checkbox" aria-label={`${k.label}: ${textLabel}`} checked={k.sms} disabled={!data.phone} onChange={(e) => save(k.kind, { sms: e.target.checked })} />
+              : <span className="text-xs text-slate-400">—</span>}</td>}
           </tr>))}</tbody>
       </table>
       {data.email_configured && <button className="btn-ghost mt-3" onClick={() => api<{ queued_to: string }>("/notifications/test-email", { method: "POST" }).then((r) => setMsg(`Test email queued to ${r.queued_to}; it should arrive within a minute or two.`)).catch((e) => setErr(e.message))}><Mail size={15} /> Send me a test email</button>}
       {msg && <p className="mt-2 text-sm text-emerald-600">{msg}</p>}
-      <p className="mt-3 text-xs text-slate-500">SMS and WhatsApp alerts need an account with a messaging provider and are not set up.</p>
+      {data.sms_configured ? (
+        <div className="mt-4 flex flex-wrap items-end gap-2">
+          <label className="block"><span className="label">Your mobile number for {textLabel} alerts</span>
+            <input className="input" placeholder="+919840012345" value={phone ?? data.phone ?? ""} onChange={(e) => setPhone(e.target.value)} /></label>
+          <button className="btn-ghost" onClick={savePhone}>Save number</button>
+          <p className="w-full text-xs text-slate-500">Text messages cost money, so only urgent alerts can be sent this way. Leave the number empty to stop them.</p>
+        </div>
+      ) : <p className="mt-3 text-xs text-slate-500">SMS and WhatsApp alerts are not set up on this server (they need a messaging provider account).</p>}
     </div>
   );
 }

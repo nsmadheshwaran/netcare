@@ -45,6 +45,21 @@ class LoginIn(BaseModel):
 class TokenOut(BaseModel):
     access_token: str
     token_type: str = "bearer"
+    refresh_token: str | None = None
+    expires_in: int | None = None  # access token lifetime, seconds
+
+
+class RefreshIn(BaseModel):
+    refresh_token: str = Field(min_length=10, max_length=200)
+
+
+class ForgotIn(BaseModel):
+    email: EmailStr
+
+
+class SetPasswordIn(BaseModel):
+    token: str = Field(min_length=10, max_length=200)
+    password: str = Field(min_length=10, max_length=128)
 
 
 class ChangePasswordIn(BaseModel):
@@ -133,9 +148,8 @@ class MemberIn(BaseModel):
     email: EmailStr
     full_name: str = Field(min_length=1, max_length=200)
     role: str
-    # Initial password set by the owner; the invitee should change it on first login.
-    # Replace with an emailed invite token once email delivery exists.
-    temporary_password: str = Field(min_length=10, max_length=128)
+    # Either a temporary password told to the person, or none: then an invite link is emailed (needs SMTP).
+    temporary_password: str | None = Field(default=None, min_length=10, max_length=128)
 
 
 class MemberUpdate(BaseModel):

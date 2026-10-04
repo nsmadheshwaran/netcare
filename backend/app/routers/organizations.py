@@ -8,6 +8,7 @@ from ..modules import MODULES, enabled, validate
 from ..permissions import ROLES
 from ..schemas import LocationIn, LocationOut, MemberIn, MemberOut, MemberUpdate, OrgIn, OrgOut
 from ..security import hash_password
+from ..services import accounts
 
 router = APIRouter(prefix="/organization", tags=["organizations"])
 
@@ -76,11 +77,17 @@ def add_member(body: MemberIn, ctx: OrgContext = Depends(require("users.manage")
         raise HTTPException(403, "Only owners can add owners")
     db = ctx.db
     user = db.scalar(select(User).where(func.lower(User.email) == body.email.lower()))
+    invite = None
     if user is None:
+        if body.temporary_password is None and not accounts.email_enabled():
+            raise HTTPException(422, "Email is not set up on this server: give a temporary password instead")
         user = User(email=body.email.lower(), full_name=body.full_name,
-                    password_hash=hash_password(body.temporary_password))
+                    password_hash=hash_password(body.temporary_password) if body.temporary_password
+                    else accounts.unusable_password())
         db.add(user)
         db.flush()
+        if body.temporary_password is None:
+            invite = accounts.create_link(db, user, "invite")
     elif db.scalar(select(Membership).where(Membership.organization_id == ctx.org_id,
                                             Membership.user_id == user.id)):
         raise HTTPException(409, "User is already a member")
@@ -88,6 +95,13 @@ def add_member(body: MemberIn, ctx: OrgContext = Depends(require("users.manage")
     m = Membership(organization_id=ctx.org_id, user_id=user.id, role=body.role)
     db.add(m)
     db.flush()
+    if invite:
+        _send_invite(ctx, user, invite)
+    elif accounts.email_enabled():
+        accounts.queue_email(db, user.email, f"You have been added to {ctx.org.name}",
+                             f"Hello {user.full_name},\n\n{ctx.user.full_name} added you to {ctx.org.name} in "
+                             f"NetCare as {body.role.replace('_', ' ')}. Sign in with your existing password.",
+                             ctx.org_id)
     ctx.audit("add_member", "membership", m.id, {"email": user.email, "role": body.role})
     db.commit()
     return _member_out(m)
@@ -115,15 +129,16 @@ def update_member(member_id: int, body: MemberUpdate, ctx: OrgContext = Depends(
     return _member_out(m)
 
 
-class PasswordResetIn(BaseModel):
-    temporary_password: str = Field(min_length=10, max_length=128)
+def _send_invite(ctx: OrgContext, user: User, raw: str) -> None:
+    from ..config import get_settings
+    accounts.queue_email(ctx.db, user.email, f"Your invitation to {ctx.org.name}",
+                         f"Hello {user.full_name},\n\n{ctx.user.full_name} invited you to {ctx.org.name} on "
+                         f"NetCare. Choose your password here (valid {get_settings().invite_days} days):\n\n"
+                         f"{accounts.link_url(raw)}\n", ctx.org_id)
 
 
-@router.post("/members/{member_id}/reset-password", status_code=204)
-def reset_member_password(member_id: int, body: PasswordResetIn, ctx: OrgContext = Depends(require("users.manage"))):
-    """Set a temporary password for a staff member who forgot theirs, and sign them out everywhere.
-    Refused for accounts that also belong to another business: one business must not be able to take over
-    a login that has access elsewhere."""
+def _member_for_admin(ctx: OrgContext, member_id: int) -> Membership:
+    """A member whose login an admin of this business may manage (not shared with another business)."""
     m = ctx.db.get(Membership, member_id)
     if not m or m.organization_id != ctx.org_id:
         raise HTTPException(404, "Member not found")
@@ -135,10 +150,35 @@ def reset_member_password(member_id: int, body: PasswordResetIn, ctx: OrgContext
         Membership.user_id == m.user_id, Membership.organization_id != ctx.org_id))
     if elsewhere:
         raise HTTPException(409, "This login also belongs to another business, so it cannot be reset from here. "
-                                 "The person can change their password while signed in")
+                                 "The person can use \"Forgot password\" on the sign-in page")
+    return m
+
+
+@router.post("/members/{member_id}/send-invite", status_code=202)
+def send_invite(member_id: int, ctx: OrgContext = Depends(require("users.manage"))):
+    """Email a link to set a password (new invite, or a reset for someone who is locked out)."""
+    if not accounts.email_enabled():
+        raise HTTPException(409, "Email is not set up on this server")
+    m = _member_for_admin(ctx, member_id)
     user = ctx.db.get(User, m.user_id)
-    user.password_hash = hash_password(body.temporary_password)
-    user.token_version += 1  # signs out every existing session
+    _send_invite(ctx, user, accounts.create_link(ctx.db, user, "invite"))
+    ctx.audit("send_invite", "membership", m.id, {"email": user.email})
+    ctx.db.commit()
+    return {"sent_to": user.email}
+
+
+class PasswordResetIn(BaseModel):
+    temporary_password: str = Field(min_length=10, max_length=128)
+
+
+@router.post("/members/{member_id}/reset-password", status_code=204)
+def reset_member_password(member_id: int, body: PasswordResetIn, ctx: OrgContext = Depends(require("users.manage"))):
+    """Set a temporary password for a staff member who forgot theirs, and sign them out everywhere.
+    Refused for accounts that also belong to another business: one business must not be able to take over
+    a login that has access elsewhere."""
+    m = _member_for_admin(ctx, member_id)
+    user = ctx.db.get(User, m.user_id)
+    accounts.set_password(ctx.db, user, body.temporary_password)  # signs out every existing session
     ctx.audit("reset_password", "membership", m.id, {"email": user.email})
     ctx.db.commit()
 

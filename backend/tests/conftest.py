@@ -18,14 +18,38 @@ from app.security import login_limiter
 _counter = itertools.count()
 
 
+# Set to a PostgreSQL URL (e.g. in CI) to run the whole suite against PostgreSQL instead of SQLite.
+PG_URL = os.environ.get("NETCARE_TEST_DATABASE_URL")
+
+
 @pytest.fixture(scope="session")
 def migrated_template(tmp_path_factory):
-    """Run the real Alembic migrations once; each test gets a copy of the result."""
-    path = tmp_path_factory.mktemp("template") / "template.db"
+    """Run the real Alembic migrations once. SQLite: each test gets a copy of the file. PostgreSQL: the
+    migrations are also run down to the start and up again, then each test starts from emptied tables."""
     cfg = Config("alembic.ini")
+    if PG_URL:
+        cfg.attributes["database_url"] = PG_URL
+        command.upgrade(cfg, "head")
+        command.downgrade(cfg, "base")
+        command.upgrade(cfg, "head")
+        return None
+    path = tmp_path_factory.mktemp("template") / "template.db"
     cfg.attributes["database_url"] = f"sqlite:///{path}"
     command.upgrade(cfg, "head")
     return path
+
+
+def _fresh_engine(tmp_path, template):
+    if PG_URL:
+        engine = make_engine(PG_URL)
+        with engine.begin() as con:
+            tables = [r[0] for r in con.exec_driver_sql(
+                "SELECT tablename FROM pg_tables WHERE schemaname = current_schema() AND tablename <> 'alembic_version'")]
+            con.exec_driver_sql(f"TRUNCATE {', '.join(tables)} RESTART IDENTITY CASCADE")
+        return engine
+    db_path = tmp_path / "test.db"
+    shutil.copyfile(template, db_path)
+    return make_engine(f"sqlite:///{db_path}")
 
 
 @pytest.fixture(autouse=True)
@@ -38,11 +62,8 @@ def storage_dir(tmp_path, monkeypatch):
 
 @pytest.fixture()
 def client(tmp_path, migrated_template):
-    """Fresh database per test: a copy of the migrated template."""
-    db_path = tmp_path / "test.db"
-    shutil.copyfile(migrated_template, db_path)
-    url = f"sqlite:///{db_path}"
-    engine = make_engine(url)
+    """Fresh database per test."""
+    engine = _fresh_engine(tmp_path, migrated_template)
     Session = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
     def _db():

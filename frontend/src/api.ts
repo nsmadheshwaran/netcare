@@ -5,11 +5,14 @@ export class ApiError extends Error {
 }
 
 const TOKEN_KEY = "netcare.token";
+const REFRESH_KEY = "netcare.refresh";
 const ORG_KEY = "netcare.org";
 
 export const session = {
   get token() { return localStorage.getItem(TOKEN_KEY); },
   set token(v: string | null) { v ? localStorage.setItem(TOKEN_KEY, v) : localStorage.removeItem(TOKEN_KEY); },
+  get refresh() { return localStorage.getItem(REFRESH_KEY); },
+  set refresh(v: string | null) { v ? localStorage.setItem(REFRESH_KEY, v) : localStorage.removeItem(REFRESH_KEY); },
   get orgId() { return localStorage.getItem(ORG_KEY); },
   set orgId(v: string | null) { v ? localStorage.setItem(ORG_KEY, v) : localStorage.removeItem(ORG_KEY); },
 };
@@ -21,7 +24,30 @@ function formatDetail(detail: unknown): string {
   return "Request failed";
 }
 
-export async function api<T = any>(path: string, opts: RequestInit & { json?: unknown } = {}): Promise<T> {
+export type Tokens = { access_token: string; refresh_token?: string | null };
+
+export function storeTokens(t: Tokens) {
+  session.token = t.access_token;
+  if (t.refresh_token) session.refresh = t.refresh_token;
+}
+
+let refreshing: Promise<boolean> | null = null;
+
+/** Swap the refresh token for new tokens. Parallel requests share one attempt (tokens rotate on use). */
+function refreshTokens(): Promise<boolean> {
+  if (!session.refresh) return Promise.resolve(false);
+  refreshing ??= fetch("/api/v1/auth/refresh", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ refresh_token: session.refresh }),
+  }).then(async (r) => {
+    if (!r.ok) { session.refresh = null; return false; }
+    storeTokens(await r.json());
+    return true;
+  }).catch(() => false).finally(() => { refreshing = null; });
+  return refreshing;
+}
+
+export async function api<T = any>(path: string, opts: RequestInit & { json?: unknown } = {}, retried = false): Promise<T> {
   const headers = new Headers(opts.headers);
   if (session.token) headers.set("Authorization", `Bearer ${session.token}`);
   if (session.orgId) headers.set("X-Organization-ID", session.orgId);
@@ -31,8 +57,10 @@ export async function api<T = any>(path: string, opts: RequestInit & { json?: un
     body = JSON.stringify(opts.json);
   }
   const res = await fetch(`/api/v1${path}`, { ...opts, headers, body });
-  if (res.status === 401 && session.token) {
+  if (res.status === 401 && session.token && !path.startsWith("/auth/login")) {
+    if (!retried && await refreshTokens()) return api<T>(path, opts, true);
     session.token = null;
+    session.refresh = null;
     window.location.assign("/login");
   }
   if (!res.ok) {

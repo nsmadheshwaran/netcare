@@ -88,9 +88,12 @@ def _set_status(c: MonitorCheck, status: str, at: datetime) -> None:
         c.status, c.status_since = status, at
 
 
-def apply_result(db, c: MonitorCheck, at: datetime, ok: bool, latency_ms: int | None, error: str | None) -> None:
+def apply_result(db, c: MonitorCheck, at: datetime, ok: bool, latency_ms: int | None, error: str | None,
+                 values: dict | None = None) -> None:
     """Advance the check's state machine with one result newer than the last applied one."""
     c.last_checked_at, c.last_latency_ms = at, latency_ms if ok else None
+    if values is not None:
+        c.last_values = values
     open_inc = db.scalar(select(MonitorIncident).where(MonitorIncident.check_id == c.id,
                                                        MonitorIncident.ended_at.is_(None)))
     if ok:
@@ -136,12 +139,13 @@ def ingest(db, agent: MonitorAgent, results: list[dict]) -> dict:
             duplicates += 1
             continue
         error = (r.get("error") or None) and r["error"][:200]
+        values = r.get("values") if c.kind == "snmp" else None
         db.add(CheckResult(organization_id=agent.organization_id, check_id=c.id, observed_at=at, ok=r["ok"],
-                           latency_ms=r.get("latency_ms"), error=error))
+                           latency_ms=r.get("latency_ms"), error=error, values=values))
         seen.add((c.id, at))
         accepted += 1
         if c.last_checked_at is None or at > c.last_checked_at:
-            apply_result(db, c, at, r["ok"], r.get("latency_ms"), error)
+            apply_result(db, c, at, r["ok"], r.get("latency_ms"), error, values)
     if checks:
         db.execute(delete(CheckResult).where(
             CheckResult.check_id.in_(list(checks)),

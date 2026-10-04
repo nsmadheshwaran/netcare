@@ -87,6 +87,10 @@ X-Organization-ID: <organization_id from /auth/me>
 | GET /organization/modules, PUT /organization/modules {enabled: [...]} | member, org.manage |
 | GET /organization/onboarding | member |
 | POST /organization/members/{id}/reset-password {temporary_password} | users.manage |
+| POST /auth/refresh {refresh_token}, POST /auth/logout {refresh_token}, GET /auth/config | public (token in body) |
+| POST /auth/forgot-password {email}, POST /auth/set-password {token, password} | public |
+| POST /organization/members/{id}/send-invite | users.manage |
+| PUT /notifications/phone {phone} | signed-in member |
 | GET /dashboard/summary?period=day,week,month,quarter,year&location_id= | dashboard.view |
 | GET /audit-logs | audit.view |
 | GET /health, GET /ready | public |

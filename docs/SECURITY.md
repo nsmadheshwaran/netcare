@@ -73,6 +73,17 @@
 
 Still open (below).
 
+## Sessions and account recovery (1.1.0)
+- Access tokens last 60 minutes; a refresh token (30 days, stored hashed) renews them silently. Refresh tokens
+  rotate on every use, and presenting one that was already used revokes that whole sign-in (it was copied).
+  Sign out ends the sign-in; password change, password reset and "sign out everywhere" end all of them.
+- Invites and password resets are single-use, hashed, expiring links (7 days / 60 minutes). The token is in the
+  URL fragment (`#token=`), which browsers never send to servers or in Referer headers, and the page removes it
+  from the address bar. "Forgot password" answers the same whether or not the account exists and is limited
+  per address.
+- Text-message provider credentials and SNMP communities are server secrets: never returned by the API to the
+  browser (the agent receives its own checks' communities over HTTPS).
+
 ## Known limitations (fix before going live)
 - **No malware scanning of uploads.** The allow-list blocks executables and macro documents, but a malicious
   PDF or image could still target a reader's PDF/image software. Add ClamAV (or similar) before accepting
@@ -81,7 +92,6 @@ Still open (below).
 - **Documents are not encrypted at rest** by NetCare. Use disk encryption on the server.
 - **Tokens live in `localStorage`.** That is simple but readable by any XSS. React escapes output and there is
   no raw HTML rendering, but before production consider httpOnly cookies with CSRF protection.
-- **No refresh tokens.** Users sign in again after the token expires.
 - **No password reset or email verification yet.** Both need an email provider. For now, an owner adds users
   with a temporary password that the user should change.
 - **The login limiter is in memory**, so it only works with a single backend worker (the Docker image runs

@@ -5,7 +5,7 @@ import "./index.css";
 import { AuthProvider, useAuth } from "./auth";
 import Layout from "./components/Layout";
 import { Spinner } from "./components/ui";
-import { Login, Register } from "./pages/Auth";
+import { ForgotPassword, Login, Register, SetPassword } from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Customers from "./pages/Customers";
 import Products from "./pages/Products";
@@ -43,6 +43,8 @@ createRoot(document.getElementById("root")!).render(
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/set-password" element={<SetPassword />} />
           <Route element={<Protected><Layout /></Protected>}>
             <Route index element={<Dashboard />} />
             <Route path="customers" element={<Customers />} />

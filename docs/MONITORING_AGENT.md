@@ -13,7 +13,13 @@ standard library. It runs on a computer at a customer's site and reports ping an
 | Queue and retry when offline | Results go to `queue.jsonl` next to the config (up to 50,000; the oldest are dropped beyond that) and are sent with backoff from 5 s to 10 min. Results are idempotent, so a retry after a lost response is harmless. |
 | Never | No network discovery or scanning, no logins to devices, no credential guessing, no exploitation, no remote commands, no hidden persistence, no collection of files, keystrokes or messages. The code has no way to do these: it runs `ping` with a validated host and opens TCP connections, nothing else. |
 
-SNMP metrics are **not** implemented yet.
+## SNMP readings (read-only)
+Choose **SNMP readings** as the check type, give the device's read-only community and the OIDs to read (presets
+for uptime, device name, port status and traffic are offered). The agent sends one SNMP v2c **GET** for exactly
+those OIDs: never SET, WALK or BULK, so it cannot change a device or explore it. The check is up when the device
+answers without an error; the latest readings show in the check's details. The community is stored on the
+server and sent only to the agent; the web pages never show it again after saving. Use a read-only community
+that is different from the device's admin one.
 
 ## Endpoint security (optional, Windows)
 Switch on **Report this PC's Microsoft Defender status** when adding or editing the agent. Every 15 minutes
@@ -27,7 +33,19 @@ Defender detections of the last 30 days, including the file paths Defender lists
 to find and clean the file). It does not read the files themselves. The status covers only the PC the agent
 runs on: install an agent on each PC you want to see. A PC with network checks switched off is fine.
 
-## Install (Windows)
+## Install (Windows), with the install script
+1. In NetCare: **Network monitoring → Add agent**. Copy the token shown (it is shown once).
+2. Install Python 3.10+ from python.org; choose "Install for all users" if offered, and tick "Add to PATH".
+3. Copy `netcare_agent.py`, `install-agent.ps1` and `uninstall-agent.ps1` to the PC, open **PowerShell as
+   administrator** in that folder and run:
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File .\install-agent.ps1 -ServerUrl https://netcare.example.com -Token nca_...
+   ```
+   It copies the agent to `C:\ProgramData\NetCare\Agent` (readable only by Administrators and SYSTEM), runs it
+   once to prove it reaches NetCare, then registers and starts the visible task "NetCare Monitoring Agent"
+   (at startup, restarted if it stops). Uninstall with `.\uninstall-agent.ps1`, and revoke the agent in NetCare.
+
+## Install (Windows), by hand
 1. In NetCare: **Network monitoring → Add agent**. Copy the `agent.json` shown (the token is shown once).
 2. On an always-on PC at the site, install Python 3.10+ from python.org (tick "Add to PATH").
 3. Create `C:\NetCare\agent\`, copy `netcare_agent.py` and `agent.json` there. Restrict the folder to

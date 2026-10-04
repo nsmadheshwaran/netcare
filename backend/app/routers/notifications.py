@@ -1,11 +1,14 @@
 """Phase 9: the signed-in user's notifications and preferences; email outbox status for administrators."""
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+import re
+
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import func, select, update
 
 from ..deps import OrgContext, get_org_context, require
 from ..models import utcnow
 from ..models_notify import EmailOutbox, Notification, NotificationPref
+from ..config import get_settings
 from ..services import notify as nt
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
@@ -15,6 +18,21 @@ class PrefIn(BaseModel):
     kind: str
     in_app: bool
     email: bool
+    sms: bool = False
+
+
+class PhoneIn(BaseModel):
+    phone: str | None = Field(default=None, max_length=20)
+
+    @field_validator("phone")
+    @classmethod
+    def _e164(cls, v):
+        if v is None or not v.strip():
+            return None
+        v = re.sub(r"[\s()-]", "", v)
+        if not re.fullmatch(r"\+[1-9]\d{7,14}", v):
+            raise ValueError("Use the international format, e.g. +919840012345")
+        return v
 
 
 def _mine(ctx: OrgContext):
@@ -74,8 +92,10 @@ def get_preferences(ctx: OrgContext = Depends(get_org_context)):
             continue
         p = saved.get(kind)
         out.append({"kind": kind, "label": label, "in_app": p.in_app if p else True,
-                    "email": p.email if p else email_default})
-    return {"email_configured": nt.email_configured(), "email_address": ctx.user.email, "kinds": out}
+                    "email": p.email if p else email_default, "sms_allowed": kind in nt.SMS_KINDS,
+                    "sms": bool(p.sms) if p and kind in nt.SMS_KINDS else False})
+    return {"email_configured": nt.email_configured(), "email_address": ctx.user.email, "kinds": out,
+            "sms_configured": nt.sms_configured(), "sms_channel": get_settings().sms_channel, "phone": ctx.user.phone}
 
 
 @router.put("/preferences")
@@ -89,7 +109,15 @@ def set_preferences(body: list[PrefIn], ctx: OrgContext = Depends(get_org_contex
         if p is None:
             p = NotificationPref(user_id=ctx.user.id, organization_id=ctx.org_id, kind=b.kind)
             ctx.db.add(p)
-        p.in_app, p.email = b.in_app, b.email
+        p.in_app, p.email, p.sms = b.in_app, b.email, b.sms and b.kind in nt.SMS_KINDS
+    ctx.db.commit()
+    return get_preferences(ctx)
+
+
+@router.put("/phone")
+def set_phone(body: PhoneIn, ctx: OrgContext = Depends(get_org_context)):
+    """Your own mobile number for text-message alerts (only used for kinds you switch on)."""
+    ctx.user.phone = body.phone
     ctx.db.commit()
     return get_preferences(ctx)
 
@@ -112,7 +140,7 @@ def outbox(ctx: OrgContext = Depends(require("org.manage")), status: str | None 
         q = q.where(EmailOutbox.status == status)
     rows = ctx.db.scalars(q.order_by(EmailOutbox.id.desc()).limit(100)).all()
     return {"email_configured": nt.email_configured(),
-            "items": [{"id": e.id, "to": e.to_address, "subject": e.subject, "status": e.status,
+            "items": [{"id": e.id, "channel": e.channel, "to": e.to_address, "subject": e.subject, "status": e.status,
                        "attempts": e.attempts, "last_error": e.last_error, "created_at": e.created_at,
                        "sent_at": e.sent_at} for e in rows]}
 

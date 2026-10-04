@@ -2,7 +2,7 @@ from logging.config import fileConfig
 
 from alembic import context
 
-from app import models, models_docs, models_finance, models_monitoring, models_notify, models_security, models_service, models_trade  # noqa: F401  (registers tables)
+from app import models, models_auth, models_docs, models_finance, models_monitoring, models_notify, models_security, models_service, models_trade  # noqa: F401  (registers tables)
 from app.config import get_settings
 from app.db import Base, make_engine
 

@@ -32,7 +32,7 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 MAX_QUEUE = 50_000
 BATCH = 500
 HOST_RE = re.compile(r"^(?=.{1,253}$)([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)*"
@@ -95,15 +95,157 @@ def check_icmp(host: str, timeout_ms: int) -> tuple[bool, int | None, str | None
     return False, None, "ping: no reply"
 
 
+# ---------------- SNMP v2c GET (read-only) ----------------
+# Minimal BER encoding for one GetRequest. Only GET: no SET, no WALK/BULK, so it reads exactly the OIDs listed.
+OID_RE = re.compile(r"^[0-2](\.\d{1,10}){1,40}$")
+SNMP_ERRORS = {1: "tooBig", 2: "noSuchName", 3: "badValue", 4: "readOnly", 5: "genErr", 6: "noAccess"}
+
+
+def _len(n: int) -> bytes:
+    if n < 0x80:
+        return bytes([n])
+    b = n.to_bytes((n.bit_length() + 7) // 8, "big")
+    return bytes([0x80 | len(b)]) + b
+
+
+def _tlv(tag: int, content: bytes) -> bytes:
+    return bytes([tag]) + _len(len(content)) + content
+
+
+def _int(v: int) -> bytes:
+    return _tlv(0x02, v.to_bytes(max(1, (v.bit_length() + 8) // 8), "big", signed=True))
+
+
+def _oid(oid: str) -> bytes:
+    parts = [int(p) for p in oid.split(".")]
+    out = bytearray([40 * parts[0] + parts[1]])
+    for p in parts[2:]:
+        chunk = [p & 0x7F]
+        p >>= 7
+        while p:
+            chunk.append(0x80 | (p & 0x7F))
+            p >>= 7
+        out += bytes(reversed(chunk))
+    return _tlv(0x06, bytes(out))
+
+
+def snmp_get_request(community: str, oids: list[str], request_id: int) -> bytes:
+    varbinds = b"".join(_tlv(0x30, _oid(o) + b"\x05\x00") for o in oids)
+    pdu = _tlv(0xA0, _int(request_id) + _int(0) + _int(0) + _tlv(0x30, varbinds))
+    return _tlv(0x30, _int(1) + _tlv(0x04, community.encode()) + pdu)
+
+
+def _read(buf: bytes, i: int) -> tuple[int, bytes, int]:
+    """Read one TLV at i: (tag, content, next index)."""
+    tag, n = buf[i], buf[i + 1]
+    i += 2
+    if n & 0x80:
+        k = n & 0x7F
+        n = int.from_bytes(buf[i:i + k], "big")
+        i += k
+    if i + n > len(buf):
+        raise ValueError("truncated SNMP packet")
+    return tag, buf[i:i + n], i + n
+
+
+def _decode_oid(b: bytes) -> str:
+    parts, v = [b[0] // 40, b[0] % 40], 0
+    for x in b[1:]:
+        v = (v << 7) | (x & 0x7F)
+        if not x & 0x80:
+            parts.append(v)
+            v = 0
+    return ".".join(map(str, parts))
+
+
+def _value(tag: int, b: bytes):
+    if tag == 0x02:
+        return int.from_bytes(b, "big", signed=True)
+    if tag in (0x41, 0x42, 0x43, 0x46):  # Counter32, Gauge32, TimeTicks, Counter64
+        return int.from_bytes(b, "big")
+    if tag == 0x04:
+        try:
+            s = b.decode("utf-8")
+            return s if s.isprintable() else b.hex(":")
+        except UnicodeDecodeError:
+            return b.hex(":")
+    if tag == 0x40 and len(b) == 4:
+        return ".".join(map(str, b))
+    if tag == 0x06:
+        return _decode_oid(b)
+    if tag == 0x05:
+        return None
+    return {0x80: "noSuchObject", 0x81: "noSuchInstance", 0x82: "endOfMibView"}.get(tag, b.hex())
+
+
+def parse_snmp_response(packet: bytes, request_id: int) -> tuple[dict, str | None]:
+    """Returns ({oid: value}, error or None)."""
+    _, msg, _ = _read(packet, 0)
+    i = 0
+    _, _version, i = _read(msg, i)
+    _, _community, i = _read(msg, i)
+    tag, pdu, _ = _read(msg, i)
+    if tag != 0xA2:
+        raise ValueError("not an SNMP response")
+    j = 0
+    _, rid, j = _read(pdu, j)
+    if int.from_bytes(rid, "big", signed=True) != request_id:
+        raise ValueError("response to another request")
+    _, status, j = _read(pdu, j)
+    _, _index, j = _read(pdu, j)
+    _, vbl, _ = _read(pdu, j)
+    values, k = {}, 0
+    while k < len(vbl):
+        _, vb, k = _read(vbl, k)
+        _, oid, m = _read(vb, 0)
+        vtag, vval, _ = _read(vb, m)
+        values[_decode_oid(oid)] = _value(vtag, vval)
+    code = int.from_bytes(status, "big")
+    return values, (f"SNMP error: {SNMP_ERRORS.get(code, code)}" if code else None)
+
+
+def check_snmp(host: str, port: int, community: str, oids: list[str], timeout_ms: int):
+    host = safe_host(host)
+    oids = [o for o in oids if OID_RE.match(o)][:20]
+    if not oids:
+        return False, None, "no valid OIDs configured", None
+    rid = int.from_bytes(os.urandom(3), "big")
+    start = time.perf_counter()
+    with socket.socket(socket.AF_INET6 if ":" in host else socket.AF_INET, socket.SOCK_DGRAM) as s:
+        s.settimeout(timeout_ms / 1000)
+        try:
+            s.sendto(snmp_get_request(community, oids, rid), (host, int(port)))
+            while True:
+                data, _addr = s.recvfrom(65535)
+                try:
+                    values, err = parse_snmp_response(data, rid)
+                    break
+                except (ValueError, IndexError):
+                    continue  # stray or malformed packet: keep waiting until the timeout
+        except socket.timeout:
+            return False, None, "SNMP: no answer (wrong community, or SNMP off?)", None
+        except OSError as e:
+            return False, None, f"SNMP: {e.strerror or e}", None
+    lat = round((time.perf_counter() - start) * 1000)
+    return err is None, lat, err, {k: v for k, v in values.items()}
+
+
 def run_check(c: dict) -> dict:
+    values = None
     try:
         if c["kind"] == "tcp":
             ok, lat, err = check_tcp(c["host"], c["port"], c["timeout_ms"])
+        elif c["kind"] == "snmp":
+            ok, lat, err, values = check_snmp(c["host"], c["port"] or 161, c.get("snmp_community") or "public",
+                                              c.get("snmp_oids") or [], c["timeout_ms"])
         else:
             ok, lat, err = check_icmp(c["host"], c["timeout_ms"])
     except ValueError as e:
         ok, lat, err = False, None, str(e)
-    return {"check_id": c["id"], "observed_at": now_iso(), "ok": ok, "latency_ms": lat, "error": err}
+    r = {"check_id": c["id"], "observed_at": now_iso(), "ok": ok, "latency_ms": lat, "error": err}
+    if values is not None:
+        r["values"] = {k: v for k, v in list(values.items())[:20]}
+    return r
 
 
 # ---------------- endpoint security (Windows Defender, read-only) ----------------
@@ -263,7 +405,7 @@ class Agent:
 
     def fetch_config(self):
         cfg = self._call("GET", "/config")
-        self.checks = [c for c in cfg["checks"] if c["kind"] in ("icmp", "tcp")]
+        self.checks = [c for c in cfg["checks"] if c["kind"] in ("icmp", "tcp", "snmp")]
         self.refresh_seconds = int(cfg.get("config_refresh_seconds", 300))
         self.collect_endpoint = bool(cfg.get("collect_endpoint"))
         self.endpoint_seconds = max(300, int(cfg.get("endpoint_report_seconds", 900)))

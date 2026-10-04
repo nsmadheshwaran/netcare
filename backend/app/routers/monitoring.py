@@ -3,6 +3,7 @@
 The agent API authenticates with a per-agent token (`Authorization: Bearer nca_...`), not a user login.
 An agent can read only its own configuration and report results only for its own checks.
 """
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Literal
 
@@ -21,6 +22,7 @@ from ..services.trade import get_owned
 
 router = APIRouter(tags=["monitoring"])
 AGENT_MAX_BATCH = 1000
+OID_RE = re.compile(r"^[0-2](\.\d{1,10}){1,40}$")
 
 
 # ---------------- schemas ----------------
@@ -56,7 +58,7 @@ class CheckIn(BaseModel):
     agent_id: int
     asset_id: int | None = None
     name: str = Field(min_length=1, max_length=120)
-    kind: Literal["icmp", "tcp"]
+    kind: Literal["icmp", "tcp", "snmp"]
     host: str | None = Field(default=None, max_length=255)  # defaults to the asset's IP address
     port: int | None = Field(default=None, ge=1, le=65535)
     interval_seconds: int = Field(60, ge=30, le=3600)
@@ -64,6 +66,27 @@ class CheckIn(BaseModel):
     failure_threshold: int = Field(3, ge=1, le=20)
     latency_warn_ms: int | None = Field(default=None, ge=1, le=60000)
     enabled: bool = True
+    # SNMP only. Leave the community out when editing to keep the saved one.
+    snmp_community: str | None = Field(default=None, max_length=64)
+    snmp_oids: list[str] | None = Field(default=None, max_length=20)
+
+    @field_validator("snmp_oids")
+    @classmethod
+    def _oids(cls, v):
+        if v is None:
+            return v
+        v = [o.strip().lstrip(".") for o in v if o.strip()]
+        bad = [o for o in v if not OID_RE.match(o)]
+        if bad:
+            raise ValueError(f"Not an OID: {bad[0]} (use dotted numbers like 1.3.6.1.2.1.1.3.0)")
+        return v
+
+    @field_validator("snmp_community")
+    @classmethod
+    def _community(cls, v):
+        if v is not None and (not v or not v.isprintable()):
+            raise ValueError("Community must be printable text")
+        return v
 
     @field_validator("host")
     @classmethod
@@ -74,6 +97,12 @@ class CheckIn(BaseModel):
     def _port(self):
         if self.kind == "tcp" and self.port is None:
             raise ValueError("A TCP check needs a port")
+        if self.kind == "snmp":
+            self.port = self.port or 161
+            if not self.snmp_oids:
+                raise ValueError("An SNMP check needs at least one OID to read")
+        else:
+            self.snmp_community, self.snmp_oids = None, None
         if self.kind == "icmp":
             self.port = None
         if self.timeout_ms >= self.interval_seconds * 1000:
@@ -104,6 +133,9 @@ class CheckOut(BaseModel):
     last_latency_ms: int | None
     last_error: str | None
     consecutive_failures: int
+    snmp_oids: list[str] | None = None
+    has_community: bool = False
+    last_values: dict | None = None
 
 
 class ResultIn(BaseModel):
@@ -112,6 +144,14 @@ class ResultIn(BaseModel):
     ok: bool
     latency_ms: int | None = Field(default=None, ge=0, le=600000)
     error: str | None = Field(default=None, max_length=500)
+    values: dict[str, str | int | float | None] | None = Field(default=None, max_length=20)
+
+    @field_validator("values")
+    @classmethod
+    def _small(cls, v):
+        if v is None:
+            return v
+        return {str(k)[:120]: (val[:200] if isinstance(val, str) else val) for k, val in v.items()}
 
     @field_validator("observed_at")
     @classmethod
@@ -145,7 +185,8 @@ def _check_out(ctx: OrgContext, c: MonitorCheck, now: datetime | None = None) ->
                     latency_warn_ms=c.latency_warn_ms, enabled=c.enabled,
                     status=mon.effective_status(c, agent, now), stored_status=c.status, status_since=c.status_since,
                     last_checked_at=c.last_checked_at, last_latency_ms=c.last_latency_ms, last_error=c.last_error,
-                    consecutive_failures=c.consecutive_failures)
+                    consecutive_failures=c.consecutive_failures, snmp_oids=c.snmp_oids,
+                    has_community=bool(c.snmp_community), last_values=c.last_values)
 
 
 def asset_monitor_status(ctx: OrgContext, asset_id: int) -> str | None:
@@ -270,7 +311,10 @@ def list_checks(ctx: OrgContext = Depends(require("monitoring.view")), agent_id:
 @router.post("/monitoring/checks", response_model=CheckOut, status_code=201)
 def create_check(body: CheckIn, ctx: OrgContext = Depends(require("monitoring.manage"))):
     host = _validate_check(ctx, body)
-    c = MonitorCheck(organization_id=ctx.org_id, **{**body.model_dump(), "host": host})
+    data = {**body.model_dump(), "host": host}
+    if body.kind == "snmp" and not data["snmp_community"]:
+        data["snmp_community"] = "public"
+    c = MonitorCheck(organization_id=ctx.org_id, **data)
     ctx.db.add(c)
     ctx.db.flush()
     ctx.audit("create", "monitor_check", c.id, {"kind": c.kind, "host": c.host, "port": c.port})
@@ -288,7 +332,9 @@ def update_check(check_id: int, body: CheckIn, ctx: OrgContext = Depends(require
     c = get_owned(ctx, MonitorCheck, check_id, "Check")
     host = _validate_check(ctx, body, exclude_id=c.id, current_agent_id=c.agent_id)
     new = {**body.model_dump(), "host": host}
-    target_changed = any(getattr(c, k) != new[k] for k in ("agent_id", "kind", "host", "port"))
+    if body.kind == "snmp" and not new["snmp_community"]:
+        new["snmp_community"] = c.snmp_community or "public"  # write-only: keep the saved one
+    target_changed = any(getattr(c, k) != new[k] for k in ("agent_id", "kind", "host", "port", "snmp_oids"))
     for k, v in new.items():
         setattr(c, k, v)
     if target_changed:  # old state described another target
@@ -374,7 +420,10 @@ def agent_config(agent: MonitorAgent = Depends(current_agent), db: Session = Dep
     return {"agent_id": agent.id, "server_time": utcnow().isoformat(), "config_refresh_seconds": 300,
             "collect_endpoint": agent.collect_endpoint, "endpoint_report_seconds": 900,
             "checks": [{"id": c.id, "kind": c.kind, "host": c.host, "port": c.port,
-                        "interval_seconds": c.interval_seconds, "timeout_ms": c.timeout_ms} for c in checks]}
+                        "interval_seconds": c.interval_seconds, "timeout_ms": c.timeout_ms,
+                        **({"snmp_community": c.snmp_community, "snmp_oids": c.snmp_oids}
+                           if c.kind == "snmp" else {})}
+                       for c in checks]}
 
 
 @router.post("/agent/results")

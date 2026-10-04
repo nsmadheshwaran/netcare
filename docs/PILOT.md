@@ -13,8 +13,7 @@ Use this checklist to run NetCare for one real business before a wider rollout. 
       `NETCARE_CORS_ORIGINS` and `NETCARE_APP_URL` to the public address.
 - [ ] Optional: SMTP settings for email alerts ([NOTIFICATIONS](NOTIFICATIONS.md)).
 - [ ] `docker compose up -d --build`; open the site; register the business (this creates the owner).
-- [ ] **Run PostgreSQL verification once**: the automated tests run on SQLite. Run the backend test suite
-      against a scratch PostgreSQL database before go-live (see [TESTING](TESTING.md#gaps)).
+- [ ] Check that the latest GitHub Actions run is green, including **Backend (PostgreSQL 16)**.
 
 ## First day
 - [ ] Work through the **Get started** checklist on the Overview page.
@@ -36,9 +35,7 @@ Use this checklist to run NetCare for one real business before a wider rollout. 
 
 ## Known limitations to tell the pilot business
 - Not accounting or GST-filing software; the GST summary is a draft for the accountant. No e-invoice or e-way bill.
-- No password-reset email yet. An owner or manager can set a temporary password under Users and Roles →
-  Reset password (not for logins that also belong to another business); users change their own password
-  under Settings.
-- The monitoring agent and data organizer are run by hand or as a scheduled task; there is no installer yet.
-- SMS/WhatsApp alerts are not included.
-- Sign-in lasts 60 minutes, then the user signs in again (no refresh tokens).
+- Password reset by email needs SMTP configured; otherwise an owner or manager resets it under Users and Roles.
+- The agent installs with a PowerShell script as a scheduled task (not a signed Windows service); the data
+  organizer is a command-line tool.
+- SMS/WhatsApp alerts need your own provider account (Twilio, or a webhook to an Indian gateway).

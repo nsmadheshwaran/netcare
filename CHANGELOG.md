@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.1.0 (2026-10-04)
+### Added
+- Stay signed in: rotating refresh tokens (30 days), silent renewal in the app, reuse detection; sign out ends
+  the session.
+- Emailed invitations (no temporary password needed) and "Forgot password?" with single-use links; owners can
+  email a new link to a locked-out member.
+- GitHub Actions CI: backend on SQLite and PostgreSQL 16 (with a full migration down/up), frontend checks,
+  Docker builds with `nginx -t`, Playwright browser tests.
+- SNMP v2c read-only checks (GET of listed OIDs only) with readings in the check details; agent 1.2.0.
+- `install-agent.ps1` / `uninstall-agent.ps1`: one-command Windows install as a visible startup task.
+- SMS/WhatsApp alerts through Twilio or a webhook bridge; per-user opt-in and mobile number; urgent kinds only.
+- Migrations `0009`-`0011`. Test count: 141 backend tests (was 127), 5 frontend tests (was 3).
+
 ## 1.0.0 (2026-10-03): Phase 10, pilot release
 ### Added
 - Module switches (Settings → Modules): Buying and selling, Finance, Service, People, Documents, Network

@@ -60,6 +60,22 @@ Each form was type-checked, and the same API calls they make were exercised.
   customer, paying another tenant's invoice; inventory managers cannot approve POs; accountants are
   read-only on sales; technicians see no sales or payments.
 
+## Continuous integration (from 1.1.0)
+GitHub Actions (`.github/workflows/ci.yml`) runs on every push and pull request:
+backend tests on SQLite; the same suite on **PostgreSQL 16** (migrations up, all the way down and up again,
+then every test); frontend typecheck, unit tests and build; Docker images built and `nginx -t` on the real
+config; Playwright browser tests against a real backend. Run locally against PostgreSQL with
+`NETCARE_TEST_DATABASE_URL=postgresql+psycopg://user:pass@localhost/netcare_test python -m pytest`.
+
+## Results at 1.1.0 (2026-10-04)
+| Suite | Result |
+|---|---|
+| Backend pytest (SQLite, local) | **141 passed**: sessions and refresh rotation, invites, password reset, SNMP (wire format, a fake device, server rules, agent end to end), text alerts (opt-in, providers, retries) |
+| Frontend vitest | 5 passed (silent refresh, sign-out on failed refresh) |
+| PowerShell installer | both scripts parse; Python detection tested; not run as administrator here |
+| Live run | Expired access token renewed silently with rotation; forgot-password page; SNMP check form |
+| Not run locally | PostgreSQL suite, Docker/nginx check and Playwright tests run only in CI (no PostgreSQL, Docker or browser download on this PC) |
+
 ## Results at Phase 10, pilot release 1.0.0 (2026-10-03)
 | Suite | Result |
 |---|---|

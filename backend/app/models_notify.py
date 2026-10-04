@@ -36,6 +36,7 @@ class NotificationPref(Base):
     kind: Mapped[str] = mapped_column(String(30))
     in_app: Mapped[bool] = mapped_column(Boolean, default=True)
     email: Mapped[bool] = mapped_column(Boolean, default=False)
+    sms: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
 
 
 class EmailOutbox(Base):
@@ -43,9 +44,12 @@ class EmailOutbox(Base):
     __tablename__ = "email_outbox"
     __table_args__ = (Index("ix_outbox_status", "status", "next_attempt_at"),)
     id: Mapped[int] = mapped_column(primary_key=True)
-    organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), index=True)
+    # None for account emails (password reset) that belong to no single business.
+    organization_id: Mapped[int | None] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"),
+                                                        index=True)
     notification_id: Mapped[int | None] = mapped_column(ForeignKey("notifications.id", ondelete="SET NULL"))
-    to_address: Mapped[str] = mapped_column(String(200))
+    channel: Mapped[str] = mapped_column(String(10), default="email", server_default="email")  # email|sms|whatsapp
+    to_address: Mapped[str] = mapped_column(String(200))  # email address, or E.164 phone for sms/whatsapp
     subject: Mapped[str] = mapped_column(String(200))
     body: Mapped[str] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(10), default="pending")  # pending | sent | failed

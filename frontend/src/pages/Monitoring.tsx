@@ -7,9 +7,23 @@ import { useCustomers } from "../components/trade";
 import { Badge, confirmAction, Empty, ErrorBanner, Field, Modal, PageHeader, Spinner, useAsync } from "../components/ui";
 
 type Agent = { id: number; collect_endpoint: boolean; name: string; customer_id: number | null; customer_name: string | null; site_note: string | null; token_prefix: string; status: string; online: boolean; last_seen_at: string | null; last_ip: string | null; agent_version: string | null; hostname: string | null; checks: number };
-export type Check = { id: number; agent_id: number; agent_name: string; asset_id: number | null; asset_name: string | null; customer_name: string | null; name: string; kind: "icmp" | "tcp"; host: string; port: number | null; interval_seconds: number; timeout_ms: number; failure_threshold: number; latency_warn_ms: number | null; enabled: boolean; status: string; stored_status: string; status_since: string | null; last_checked_at: string | null; last_latency_ms: number | null; last_error: string | null; consecutive_failures: number };
+export type Check = { id: number; agent_id: number; agent_name: string; asset_id: number | null; asset_name: string | null; customer_name: string | null; name: string; kind: "icmp" | "tcp" | "snmp"; host: string; port: number | null; interval_seconds: number; timeout_ms: number; failure_threshold: number; latency_warn_ms: number | null; enabled: boolean; status: string; stored_status: string; status_since: string | null; last_checked_at: string | null; last_latency_ms: number | null; last_error: string | null; consecutive_failures: number; snmp_oids: string[] | null; has_community: boolean; last_values: Record<string, string | number | null> | null };
 type Window = { samples: number; uptime_pct: number | null; avg_latency_ms: number | null; p95_latency_ms: number | null; incidents: number; downtime_minutes: number };
 type Stats = { windows: Record<"24h" | "7d" | "30d", Window>; series: { t: string; samples: number; failures: number; avg_latency_ms: number | null }[]; incidents: { id: number; started_at: string; ended_at: string | null; reason: string | null; minutes: number }[] };
+
+// Common read-only OIDs (standard MIB-II / HOST-RESOURCES). Interface index 1; change the last number for others.
+const SNMP_PRESETS: [string, string][] = [
+  ["Uptime", "1.3.6.1.2.1.1.3.0"], ["Device name", "1.3.6.1.2.1.1.5.0"], ["Description", "1.3.6.1.2.1.1.1.0"],
+  ["Port 1 status", "1.3.6.1.2.1.2.2.1.8.1"], ["Port 1 bytes in", "1.3.6.1.2.1.31.1.1.1.6.1"], ["Port 1 bytes out", "1.3.6.1.2.1.31.1.1.1.10.1"],
+  ["CPU load (Linux)", "1.3.6.1.4.1.2021.10.1.3.1"],
+];
+const SNMP_NAMES: Record<string, string> = Object.fromEntries(SNMP_PRESETS.map(([l, o]) => [o, l]));
+function fmtSnmp(oid: string, v: string | number | null) {
+  if (v === null) return "—";
+  if (oid === "1.3.6.1.2.1.1.3.0" && typeof v === "number") { const s = Math.floor(v / 100); return `${Math.floor(s / 86400)} d ${Math.floor((s % 86400) / 3600)} h`; }
+  if (oid.startsWith("1.3.6.1.2.1.2.2.1.8.") && typeof v === "number") return ({ 1: "up", 2: "down", 3: "testing", 5: "dormant", 7: "lower layer down" } as Record<number, string>)[v] ?? String(v);
+  return String(v);
+}
 
 const TONE: Record<string, "green" | "amber" | "red" | "slate"> = { up: "green", degraded: "amber", down: "red", unknown: "slate" };
 export function MonitorBadge({ s }: { s: string | null | undefined }) {
@@ -78,7 +92,9 @@ function CheckForm({ initial, agents, onDone }: { initial: Partial<Check>; agent
   async function submit(e: FormEvent) {
     e.preventDefault();
     const num = (v: any) => (v === "" || v === null || v === undefined ? null : Number(v));
-    const body = { agent_id: Number(f.agent_id), asset_id: num(f.asset_id), name: f.name, kind: f.kind, host: f.host || null, port: f.kind === "tcp" ? num(f.port) : null,
+    const oids = f.kind === "snmp" ? String(f.oids_text ?? (f.snmp_oids ?? []).join("\n")).split(/[\s,]+/).filter(Boolean) : null;
+    const body = { agent_id: Number(f.agent_id), asset_id: num(f.asset_id), name: f.name, kind: f.kind, host: f.host || null, port: f.kind === "icmp" ? null : num(f.port),
+      snmp_oids: oids, snmp_community: f.kind === "snmp" && f.community ? f.community : null,
       interval_seconds: Number(f.interval_seconds), timeout_ms: Number(f.timeout_ms), failure_threshold: Number(f.failure_threshold), latency_warn_ms: num(f.latency_warn_ms), enabled: f.enabled };
     try { await api(f.id ? `/monitoring/checks/${f.id}` : "/monitoring/checks", { method: f.id ? "PUT" : "POST", json: body }); onDone(); } catch (err: any) { setError(err.message); }
   }
@@ -94,8 +110,17 @@ function CheckForm({ initial, agents, onDone }: { initial: Partial<Check>; agent
         <Field label="Agent *"><select className="input" required value={f.agent_id} onChange={set("agent_id")}>{agents.filter((a) => a.status === "active").map((a) => <option key={a.id} value={a.id}>{a.name}{a.customer_name ? ` (${a.customer_name})` : ""}</option>)}</select></Field>
         <Field label="Equipment"><select className="input" value={f.asset_id ?? ""} onChange={(e) => pickAsset(e.target.value)}><option value="">Not linked</option>{assets.data?.items.map((a) => <option key={a.id} value={a.id}>{a.name}{a.ip_address ? ` · ${a.ip_address}` : ""}</option>)}</select></Field>
         <Field label="Name *"><input className="input" required maxLength={120} value={f.name ?? ""} onChange={set("name")} placeholder="NVR web port" /></Field>
-        <Field label="Check"><select className="input" value={f.kind} onChange={set("kind")}><option value="icmp">Ping (ICMP)</option><option value="tcp">TCP port open</option></select></Field>
+        <Field label="Check"><select className="input" value={f.kind} onChange={set("kind")}><option value="icmp">Ping (ICMP)</option><option value="tcp">TCP port open</option><option value="snmp">SNMP readings (read-only)</option></select></Field>
         <Field label={`Host${selected?.ip_address ? ` (blank = ${selected.ip_address})` : " *"}`}><input className="input" value={f.host ?? ""} onChange={set("host")} placeholder="192.168.1.50 or nvr.local" /></Field>
+        {f.kind === "snmp" && <>
+          <Field label="Port"><input className="input" type="number" min={1} max={65535} value={f.port ?? ""} onChange={set("port")} placeholder="161" /></Field>
+          <Field label={f.has_community ? "Community (leave blank to keep the saved one)" : "Community (read-only)"}><input className="input" type="password" autoComplete="off" value={f.community ?? ""} onChange={set("community")} placeholder={f.has_community ? "••••••" : "public"} /></Field>
+          <Field label="OIDs to read, one per line *" className="sm:col-span-2">
+            <textarea className="input font-mono text-xs" rows={4} required value={f.oids_text ?? (f.snmp_oids ?? []).join("\n")} onChange={set("oids_text")} placeholder={"1.3.6.1.2.1.1.3.0\n1.3.6.1.2.1.2.2.1.8.1"} />
+            <span className="mt-1 flex flex-wrap gap-1">{SNMP_PRESETS.map(([label, oid]) => (
+              <button type="button" key={oid} className="btn-ghost !px-2 !py-0.5 text-xs" onClick={() => setF({ ...f, oids_text: [String(f.oids_text ?? (f.snmp_oids ?? []).join("\n")).trim(), oid].filter(Boolean).join("\n") })}>+ {label}</button>))}</span>
+          </Field>
+        </>}
         {f.kind === "tcp" && <Field label="Port *"><input className="input" type="number" min={1} max={65535} required value={f.port ?? ""} onChange={set("port")} placeholder="554 (RTSP), 80, 8000" /></Field>}
         <Field label="Every (seconds)"><input className="input" type="number" min={30} max={3600} value={f.interval_seconds} onChange={set("interval_seconds")} /></Field>
         <Field label="Timeout (ms)"><input className="input" type="number" min={200} max={10000} value={f.timeout_ms} onChange={set("timeout_ms")} /></Field>
@@ -122,6 +147,14 @@ export function CheckDetail({ check }: { check: Check }) {
         <span className="text-slate-500">· every {check.interval_seconds}s via {check.agent_name} · last result {ago(check.last_checked_at)}</span>
       </div>
       {check.last_error && check.status !== "up" && <div className="text-sm text-red-600">Last error: {check.last_error}</div>}
+      {check.kind === "snmp" && <div>
+        <h3 className="mb-1 font-medium">Latest SNMP readings</h3>
+        {!check.last_values ? <p className="text-sm text-slate-500">No readings yet.</p> : (
+          <table className="w-full text-sm"><tbody>{Object.entries(check.last_values).map(([oid, v]) => (
+            <tr key={oid} className="border-t border-slate-100 dark:border-slate-800"><td className="td text-slate-500">{SNMP_NAMES[oid] ?? <span className="font-mono text-xs">{oid}</span>}</td>
+              <td className="td text-right font-mono">{fmtSnmp(oid, v)}</td></tr>))}</tbody></table>
+        )}
+      </div>}
       <div className="grid gap-3 sm:grid-cols-3">{(["24h", "7d", "30d"] as const).map((k) => { const w = data.windows[k]; return (
         <div key={k} className="card !p-3"><div className="text-xs text-slate-500">Last {k}</div>
           <div className="text-lg font-semibold">{w.uptime_pct === null ? "No data" : `${w.uptime_pct}% up`}</div>

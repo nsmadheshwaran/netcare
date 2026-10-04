@@ -41,6 +41,9 @@ KINDS: dict[str, tuple[str, str | None, bool]] = {
 }
 
 
+# Text messages cost money per message: only these urgent kinds can be sent by SMS/WhatsApp.
+SMS_KINDS = {"monitor_down", "endpoint_critical", "ticket_assigned"}
+
 # Direct kinds (no permission) still belong to a module.
 KIND_MODULE = {"ticket_assigned": "service", "task_assigned": "people", "leave_decided": "people"}
 assert set(KIND_MODULE.values()) <= set(MODULES)
@@ -59,10 +62,19 @@ def members_with(db, org_id: int, perm: str | None) -> list[tuple[Membership, Us
     return [(m, u) for m, u in rows if perm is None or perm in effective_permissions(m.role, org)]
 
 
-def _prefs(db, org_id: int, user_id: int, kind: str) -> tuple[bool, bool]:
+def sms_configured() -> bool:
+    s = get_settings()
+    if s.sms_provider == "twilio":
+        return bool(s.twilio_account_sid and s.twilio_auth_token and s.twilio_from)
+    if s.sms_provider == "webhook":
+        return bool(s.sms_webhook_url)
+    return False
+
+
+def _prefs(db, org_id: int, user_id: int, kind: str) -> tuple[bool, bool, bool]:
     p = db.scalar(select(NotificationPref).where(NotificationPref.organization_id == org_id,
                                                  NotificationPref.user_id == user_id, NotificationPref.kind == kind))
-    return (p.in_app, p.email) if p else (True, KINDS[kind][2])
+    return (p.in_app, p.email, bool(p.sms) and kind in SMS_KINDS) if p else (True, KINDS[kind][2], False)
 
 
 def notify(db, org_id: int, kind: str, title: str, body: str | None = None, link: str | None = None,
@@ -78,8 +90,9 @@ def notify(db, org_id: int, kind: str, title: str, body: str | None = None, link
         recipients = [(m, u) for m, u in recipients if u.id in wanted]
     created = 0
     for _m, u in recipients:
-        in_app, email = _prefs(db, org_id, u.id, kind)
-        if not in_app and not (email and email_configured()):
+        in_app, email, sms = _prefs(db, org_id, u.id, kind)
+        sms = sms and sms_configured() and bool(u.phone)
+        if not in_app and not (email and email_configured()) and not sms:
             continue
         if dedupe and db.scalar(select(Notification.id).where(
                 Notification.user_id == u.id, Notification.organization_id == org_id,
@@ -96,6 +109,11 @@ def notify(db, org_id: int, kind: str, title: str, body: str | None = None, link
                                           "You can change which emails you get under Alerts > Preferences.") if x)
             db.add(EmailOutbox(organization_id=org_id, notification_id=n.id, to_address=u.email,
                                subject=f"[NetCare] {title}"[:200], body=text))
+        if sms:
+            url = get_settings().app_url.rstrip("/")
+            short = f"NetCare: {title}" + (f" {url}{link}" if url and link else "")
+            db.add(EmailOutbox(organization_id=org_id, notification_id=n.id, channel=get_settings().sms_channel,
+                               to_address=u.phone, subject=title[:200], body=short[:300]))
         created += 1
     return created
 
@@ -181,21 +199,54 @@ def _send(msg: EmailMessage) -> None:
         smtp.send_message(msg)
 
 
-def deliver_emails(db, sender=None, limit: int = 50) -> dict:
-    """Send due emails. Failures back off 2, 4, 8, 16 minutes and give up after MAX_ATTEMPTS."""
-    if not email_configured():
+def _send_text(channel: str, to: str, body: str) -> None:
+    """Send one SMS/WhatsApp message through the configured provider. Raises on failure (then retried)."""
+    import base64
+    import json
+    import urllib.parse
+    import urllib.request
+    s = get_settings()
+    if s.sms_provider == "twilio":
+        prefix = "whatsapp:" if channel == "whatsapp" else ""
+        data = urllib.parse.urlencode({"To": prefix + to, "From": prefix + s.twilio_from, "Body": body}).encode()
+        req = urllib.request.Request(
+            f"https://api.twilio.com/2010-04-01/Accounts/{urllib.parse.quote(s.twilio_account_sid)}/Messages.json",
+            data=data, method="POST")
+        auth = base64.b64encode(f"{s.twilio_account_sid}:{s.twilio_auth_token}".encode()).decode()
+        req.add_header("Authorization", f"Basic {auth}")
+    elif s.sms_provider == "webhook":
+        req = urllib.request.Request(s.sms_webhook_url, method="POST", data=json.dumps(
+            {"to": to, "message": body, "channel": channel}).encode(), headers={"Content-Type": "application/json"})
+        if s.sms_webhook_secret:
+            req.add_header("Authorization", f"Bearer {s.sms_webhook_secret}")
+    else:
+        raise RuntimeError("No text-message provider configured")
+    with urllib.request.urlopen(req, timeout=20) as r:
+        if r.status >= 300:
+            raise RuntimeError(f"provider answered {r.status}")
+
+
+def deliver_emails(db, sender=None, text_sender=None, limit: int = 50) -> dict:
+    """Send due emails and text messages. Failures back off 2, 4, 8, 16 minutes and give up after MAX_ATTEMPTS.
+    (Name kept for compatibility; it delivers every channel in the outbox.)"""
+    channels = (["email"] if email_configured() else []) + (["sms", "whatsapp"] if sms_configured() else [])
+    if not channels:
         return {"sent": 0, "failed": 0}
-    sender = sender or _send
+    sender, text_sender = sender or _send, text_sender or _send_text
     now, sent, failed = utcnow(), 0, 0
-    rows = db.scalars(select(EmailOutbox).where(EmailOutbox.status == "pending", EmailOutbox.next_attempt_at <= now)
+    rows = db.scalars(select(EmailOutbox).where(EmailOutbox.status == "pending", EmailOutbox.next_attempt_at <= now,
+                                                EmailOutbox.channel.in_(channels))
                       .order_by(EmailOutbox.id).limit(limit)).all()
     for e in rows:
-        msg = EmailMessage()
-        msg["From"], msg["To"], msg["Subject"] = get_settings().smtp_from, e.to_address, e.subject
-        msg.set_content(e.body)
         e.attempts += 1
         try:
-            sender(msg)
+            if e.channel == "email":
+                msg = EmailMessage()
+                msg["From"], msg["To"], msg["Subject"] = get_settings().smtp_from, e.to_address, e.subject
+                msg.set_content(e.body)
+                sender(msg)
+            else:
+                text_sender(e.channel, e.to_address, e.body)
             e.status, e.sent_at, e.last_error = "sent", utcnow(), None
             sent += 1
         except Exception as ex:  # any SMTP/network error: retry later, never crash the worker

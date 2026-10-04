@@ -99,7 +99,8 @@ Local dev uses SQLite by default (`netcare_dev.db`). For PostgreSQL, set
 - [x] **Phase 9, notifications:** in-app bell and Alerts page, per-user preferences, email via SMTP with a retrying outbox, event alerts and daily digests
 - [ ] Phase 9 follow-ups: SMS/WhatsApp (needs a provider account and approved templates), web push
 - [x] **Phase 10, pilot release 1.0.0:** module switches enforced by the API, Get started checklist, password reset by owners, security review and fixes (IP spoofing, rate limits, CSP), end-to-end and tenant-isolation tests, [pilot checklist](docs/PILOT.md)
-- [ ] After the pilot: emailed invites and self-service password reset, refresh tokens, Playwright browser tests, verified PostgreSQL CI run, agent installer
+- [x] **1.1.0:** stay signed in (rotating refresh tokens), emailed invites and password reset, GitHub Actions CI (SQLite, PostgreSQL 16, Docker/nginx, Playwright), SNMP read-only readings, agent install script, SMS/WhatsApp alerts (Twilio or webhook)
+- [ ] Not planned without outside approval: GST e-invoice (IRN) and e-way bill (need a GST Suvidha Provider account and accountant sign-off); signed Windows service installer (needs a code-signing certificate)
 
 ## Important limitations
 

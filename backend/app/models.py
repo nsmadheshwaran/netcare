@@ -81,6 +81,7 @@ class User(TimestampMixin, Base):
     password_hash: Mapped[str] = mapped_column(String(255))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_superadmin: Mapped[bool] = mapped_column(Boolean, default=False)
+    phone: Mapped[str | None] = mapped_column(String(20))  # E.164, for text-message alerts the user opted into
     # Bumped on password change / logout-all to invalidate issued tokens.
     token_version: Mapped[int] = mapped_column(Integer, default=0)
 

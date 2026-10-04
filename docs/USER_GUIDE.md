@@ -186,8 +186,10 @@ Owners choose the modules the business uses under **Settings → Modules**. A sw
 for everyone and its data is kept until it is switched on again. The **Get started** card on the Overview
 lists the first steps and ticks them off from your real data; hide it with the × when you are done.
 
-Forgotten password: an owner or manager uses **Users and Roles → Reset password** to set a temporary one and
-tells the person directly.
+Forgot password: use **Forgot password?** on the sign-in page (needs email set up on the server). Otherwise an
+owner or manager uses **Users and Roles → Reset password** to set a temporary one, or **Email link**. When
+email is set up, new users can be invited by email instead of being given a temporary password. You stay
+signed in for up to 30 days of inactivity on a device; **Sign out** ends that.
 
 ## Service jobs
 1. **New ticket.** Pick the customer and the type (repair, installation, maintenance or complaint). Choose

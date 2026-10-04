@@ -6,7 +6,7 @@ names exactly one host. The server stores a SHA-256 hash of the agent token, nev
 """
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, ForeignKey, Index, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, CheckConstraint, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .db import Base
@@ -39,14 +39,14 @@ class MonitorCheck(TimestampMixin, Base):
     __table_args__ = (
         Index("ix_checks_org_agent", "organization_id", "agent_id"),
         CheckConstraint("interval_seconds >= 30", name="ck_check_interval"),
-        CheckConstraint("(kind = 'tcp') = (port IS NOT NULL)", name="ck_check_port"),
+        CheckConstraint("(kind = 'icmp') = (port IS NULL)", name="ck_check_port"),
     )
     id: Mapped[int] = mapped_column(primary_key=True)
     organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), index=True)
     agent_id: Mapped[int] = mapped_column(ForeignKey("monitor_agents.id", ondelete="CASCADE"))
     asset_id: Mapped[int | None] = mapped_column(ForeignKey("assets.id"), index=True)
     name: Mapped[str] = mapped_column(String(120))
-    kind: Mapped[str] = mapped_column(String(5))  # icmp | tcp
+    kind: Mapped[str] = mapped_column(String(5))  # icmp | tcp | snmp
     host: Mapped[str] = mapped_column(String(255))  # one IP address or host name; never a range
     port: Mapped[int | None] = mapped_column(Integer)
     interval_seconds: Mapped[int] = mapped_column(Integer, default=60)
@@ -54,6 +54,10 @@ class MonitorCheck(TimestampMixin, Base):
     failure_threshold: Mapped[int] = mapped_column(Integer, default=3)  # consecutive failures before "down"
     latency_warn_ms: Mapped[int | None] = mapped_column(Integer)  # slower than this is "degraded"
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    # SNMP v2c, read-only GET of these OIDs. The community is sent only to the agent, never shown again.
+    snmp_community: Mapped[str | None] = mapped_column(String(64))
+    snmp_oids: Mapped[list | None] = mapped_column(JSON)
+    last_values: Mapped[dict | None] = mapped_column(JSON)  # latest SNMP readings
     # Current state, maintained from results in observed order
     status: Mapped[str] = mapped_column(String(10), default="unknown")  # unknown | up | degraded | down
     consecutive_failures: Mapped[int] = mapped_column(Integer, default=0)
@@ -76,6 +80,7 @@ class CheckResult(Base):
     ok: Mapped[bool] = mapped_column(Boolean)
     latency_ms: Mapped[int | None] = mapped_column(Integer)
     error: Mapped[str | None] = mapped_column(String(200))
+    values: Mapped[dict | None] = mapped_column(JSON)  # SNMP readings
 
 
 class MonitorIncident(Base):

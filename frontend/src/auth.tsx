@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
-import { api, session } from "./api";
+import { api, session, storeTokens, type Tokens } from "./api";
 
 export type Membership = { organization_id: number; organization_name: string; role: string; permissions: string[] };
 type Me = { user: { id: number; email: string; full_name: string }; memberships: Membership[] };
@@ -9,7 +9,7 @@ type AuthState = {
   loading: boolean;
   current: Membership | null;
   can: (perm: string) => boolean;
-  login: (token: string) => Promise<void>;
+  login: (tokens: Tokens) => Promise<void>;
   logout: () => void;
   switchOrg: (id: number) => void;
   refresh: () => Promise<void>;
@@ -42,8 +42,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     me, loading, current,
     // UI hint only; the API enforces every permission.
     can: (p) => !!current?.permissions.includes(p),
-    login: async (token) => { session.token = token; session.orgId = null; await refresh(); },
-    logout: () => { session.token = null; session.orgId = null; setMe(null); },
+    login: async (tokens) => { storeTokens(tokens); session.orgId = null; await refresh(); },
+    logout: () => {
+      const rt = session.refresh;
+      if (rt) fetch("/api/v1/auth/logout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ refresh_token: rt }) }).catch(() => {});
+      session.token = null; session.refresh = null; session.orgId = null; setMe(null);
+    },
     switchOrg: (id) => { session.orgId = String(id); window.location.assign("/"); },
     refresh,
   };
