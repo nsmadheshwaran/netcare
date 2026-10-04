@@ -43,6 +43,8 @@ def _fresh_engine(tmp_path, template):
     if PG_URL:
         engine = make_engine(PG_URL)
         with engine.begin() as con:
+            # Fail fast and say so, instead of waiting forever behind a lock a previous test left open.
+            con.exec_driver_sql("SET lock_timeout = '15s'")
             tables = [r[0] for r in con.exec_driver_sql(
                 "SELECT tablename FROM pg_tables WHERE schemaname = current_schema() AND tablename <> 'alembic_version'")]
             con.exec_driver_sql(f"TRUNCATE {', '.join(tables)} RESTART IDENTITY CASCADE")

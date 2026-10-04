@@ -65,9 +65,13 @@ test("switching a module off removes it from the menu", async ({ page }) => {
   await register(page, "E2E Modules");
   await expect(page.getByRole("link", { name: "Service Management" })).toBeVisible();
   await page.getByRole("link", { name: "Settings", exact: true }).click();
-  await page.getByRole("checkbox", { name: "Service", exact: true }).uncheck();
+  // click(), not uncheck(): the switch shows what the server saved, so it flips once the save returns.
+  const service = page.getByRole("checkbox", { name: "Service", exact: true });
+  await service.click();
+  await expect(service).not.toBeChecked();
   await expect(page.getByRole("link", { name: "Service Management" })).toBeHidden();
   await expect(page.getByRole("link", { name: "IT Assets" })).toBeHidden();
-  await page.getByRole("checkbox", { name: "Service", exact: true }).check();
+  await service.click();
+  await expect(service).toBeChecked();
   await expect(page.getByRole("link", { name: "Service Management" })).toBeVisible();
 });

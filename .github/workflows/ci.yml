@@ -16,6 +16,7 @@ jobs:
   backend-sqlite:
     name: Backend (SQLite)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults: { run: { working-directory: backend } }
     steps:
       - uses: actions/checkout@v4
@@ -23,11 +24,12 @@ jobs:
         with: { python-version: "3.12", cache: pip, cache-dependency-path: backend/requirements*.txt }
       - run: pip install -r requirements-dev.txt
       - run: python -m pyflakes app tests ../agent ../organizer
-      - run: python -m pytest -q
+      - run: python -m pytest -q --timeout=180 --timeout-method=thread
 
   backend-postgres:
     name: Backend (PostgreSQL 16)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults: { run: { working-directory: backend } }
     services:
       postgres:
@@ -44,11 +46,13 @@ jobs:
         with: { python-version: "3.12", cache: pip, cache-dependency-path: backend/requirements*.txt }
       - run: pip install -r requirements-dev.txt
       # Migrations up, down to nothing and up again, then the full suite on PostgreSQL (row locks, constraints).
-      - run: python -m pytest -q
+      # --timeout: a test that blocks on a lock fails with a traceback instead of hanging the job.
+      - run: python -m pytest -q --timeout=180 --timeout-method=thread -x
 
   frontend:
     name: Frontend
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults: { run: { working-directory: frontend } }
     steps:
       - uses: actions/checkout@v4
@@ -62,6 +66,7 @@ jobs:
   docker:
     name: Docker images and nginx config
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - run: docker build -t netcare-backend backend
@@ -72,6 +77,7 @@ jobs:
   e2e:
     name: Browser end-to-end (Playwright)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: [backend-sqlite, frontend]
     steps:
       - uses: actions/checkout@v4
