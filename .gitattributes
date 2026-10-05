@@ -19,3 +19,4 @@ docs/ARCHITECTURE.md export-ignore
 docs/INSTALLATION.md export-ignore
 docs/SALES_AGREEMENT_TEMPLATE.md export-ignore
 scripts/seed_demo.py export-ignore
+scripts/make_brochure.py export-ignore
