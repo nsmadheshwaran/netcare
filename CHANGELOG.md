@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.3.1 (2026-10-05)
+### Added
+- Double-click installer: `Install NetCare.bat` and `Install NetCare (Office Network).bat` (self-elevates for
+  the firewall rule, no manual "Run as Administrator" needed). Adds a Desktop icon and a Start menu "NetCare"
+  folder with Open / Start / Stop / Backup Now shortcuts. `scripts/start.ps1` and `scripts/stop.ps1` back the
+  Start/Stop shortcuts.
+### Verified
+- Installed, started, stopped and backed up entirely by double-clicking, from an unzipped customer package,
+  including the shortcuts it creates.
+
 ## 1.3.0 (2026-10-04)
 ### Added
 - Customer signatures drawn on a tablet are now stored with the service ticket (migration 0012), shown on the

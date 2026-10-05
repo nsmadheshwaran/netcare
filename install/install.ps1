@@ -118,6 +118,38 @@ if (-not $NoBackupTask) {
     Write-Host "Task '$taskName' created. Backups go to $(Join-Path $root 'backups'). Copy that folder to another disk or cloud drive regularly."
 }
 
+Step "Adding shortcuts"
+try {
+    $shell = New-Object -ComObject WScript.Shell
+    $icon = "$env:SystemRoot\System32\imageres.dll,109"  # a server/network icon that ships with Windows
+
+    function New-UrlShortcut([string]$path, [string]$url) {
+        $lines = @("[InternetShortcut]", "URL=$url", "IconFile=$env:SystemRoot\System32\imageres.dll", "IconIndex=109")
+        [IO.File]::WriteAllLines($path, $lines)
+    }
+    function New-AppShortcut([string]$path, [string]$psFile, [string]$argsExtra = "") {
+        $lnk = $shell.CreateShortcut($path)
+        $lnk.TargetPath = "powershell.exe"
+        $lnk.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$psFile`" $argsExtra".Trim()
+        $lnk.WorkingDirectory = $root
+        $lnk.IconLocation = $icon
+        $lnk.Save()
+    }
+
+    $desktop = [Environment]::GetFolderPath("Desktop")
+    New-UrlShortcut (Join-Path $desktop "NetCare.url") "http://localhost:$Port"
+
+    $menu = Join-Path ([Environment]::GetFolderPath("Programs")) "NetCare"
+    New-Item -ItemType Directory -Force -Path $menu | Out-Null
+    New-UrlShortcut (Join-Path $menu "Open NetCare.url") "http://localhost:$Port"
+    New-AppShortcut (Join-Path $menu "Start NetCare.lnk") (Join-Path $root "scripts\start.ps1")
+    New-AppShortcut (Join-Path $menu "Stop NetCare.lnk") (Join-Path $root "scripts\stop.ps1")
+    New-AppShortcut (Join-Path $menu "Backup Now.lnk") (Join-Path $root "scripts\backup.ps1")
+    Write-Host "Added a 'NetCare' icon to the Desktop and a 'NetCare' folder to the Start menu."
+} catch {
+    Write-Host "Could not create shortcuts ($($_.Exception.Message)); NetCare itself is unaffected." -ForegroundColor Yellow
+}
+
 Write-Host ""
 Write-Host "Done. Open http://localhost:$Port and create the owner account (Create an account)." -ForegroundColor Green
 if (-not $NoBrowser) { Start-Process "http://localhost:$Port" }

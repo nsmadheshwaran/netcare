@@ -11,18 +11,18 @@ server. Each customer gets their **own installation and their own data**; nothin
 ## Install (about 15 minutes, mostly waiting)
 1. Install Docker Desktop, start it, and wait until it says it is running.
 2. Copy the NetCare folder to the PC (for example `C:\NetCare`).
-3. Open PowerShell in that folder and run:
-   ```powershell
-   powershell -ExecutionPolicy Bypass -File .\install\install.ps1
-   ```
-   It creates random passwords, builds and starts NetCare, schedules a **daily backup at 2:00 AM**, and
-   opens the browser. If something is missing it says what to do.
+3. Double-click **Install NetCare.bat** in that folder.
+   It creates random passwords, builds and starts NetCare, schedules a **daily backup at 2:00 AM**, adds a
+   **NetCare** Desktop icon and Start menu folder (Open / Start / Stop / Backup Now), and opens the browser.
+   If something is missing it says what to do; fix it and double-click the file again. If Windows shows
+   "Windows protected your PC", click **More info** then **Run anyway** — expected for an unsigned script.
 4. Create the owner account on the page that opens, then work through the **Get started** checklist
    (business details with GSTIN and state, products with HSN codes and GST rates, customers).
 
-**Other PCs in the office:** run the install from a PowerShell opened **as Administrator** with `-AllowLan`.
-Staff then open `http://<pc-name>:8080`. The connection is plain HTTP on the office network; do not expose the
-port to the internet. The firewall step needs Administrator and has not been tested on a real office network.
+**Other PCs in the office:** double-click **Install NetCare (Office Network).bat** instead — it asks Windows
+to confirm Administrator (needed for the firewall rule) on its own, no manual elevation required. Staff then
+open `http://<pc-name>:8080`. The connection is plain HTTP on the office network; do not expose the port to
+the internet. This has been tested on this machine but not on a real multi-PC office network yet.
 
 ## Backups: the customer must understand this
 - Backups are written to the `backups` folder next to NetCare (the newest 30 are kept).
