@@ -10,7 +10,7 @@
 **Customer:** [customer's legal name], [address], [GSTIN if any]
 
 ## 1. What is being sold
-1.1 The Seller supplies the **NetCare Business Suite**, version [1.3.0], for installation on the Customer's own
+1.1 The Seller supplies the **NetCare Business Suite**, version [1.3.1], for installation on the Customer's own
 computer or server, for use by **one business** ([customer name]) at [one location / the locations listed here:
 ___], by up to [number] staff users.
 1.2 The Seller will [install it on the Customer's computer / give the Customer the install package and the
@@ -23,10 +23,10 @@ running software; the Seller keeps the source code.]
 business use, is not transferable, and does not allow the Customer to sell, rent or give copies to others.
 
 ## 2. Price and payment
-2.1 One-time price: Rs [amount] [plus GST at the applicable rate], payable [in full on signing / in
-instalments: ___].
-2.2 Included in the price: [installation, a handover session of up to ___ hours, and ___ months of support under
-clause 4]. Anything else (extra training, custom changes, travel) is charged at Rs [rate] and agreed in writing
+2.1 One-time price: **Rs 14,999** [plus GST at the applicable rate, if the Seller is GST-registered], payable
+[in full on signing / in instalments: ___].
+2.2 Included in the price: installation, a handover session of up to [2] hours, and [3] months of support under
+clause 4. Anything else (extra training, custom changes, travel) is charged at Rs [rate] and agreed in writing
 first.
 2.3 [Late payment: the Seller may suspend support until overdue amounts are paid.]
 
@@ -40,13 +40,14 @@ those providers charge their own fees.
 having its accountant confirm them before issuing real invoices.
 
 ## 4. Support and fixes
-4.1 For [number] months from installation the Seller will fix errors in NetCare that stop it working as
-described in its user guide, at no extra charge.
+4.1 For **3 months** from installation the Seller will fix errors in NetCare that stop it working as described
+in its user guide, at no extra charge.
 4.2 Support is by [email/phone/WhatsApp] at [contact], on [days and hours]. The Seller aims to reply within
 [number] working hours; this is a target, not a guarantee.
 4.3 Not covered: problems caused by the Customer's computer, network or other software, changes made by the
 Customer or anyone else to the software, loss of data from not keeping backups, and requests for new features.
-4.4 After the support period, support is available at Rs [rate] [per hour / per year].
+4.4 After the support period, support is available at **Rs 4,999 per year** (covering fixes and updates under
+this clause), or Rs [rate] per hour for one-off help without taking the annual plan.
 4.5 New versions: [the Seller will / will not] provide updates after the support period. Updates may be charged.
 
 ## 5. Backups and the Customer's responsibilities
